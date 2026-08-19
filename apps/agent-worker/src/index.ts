@@ -9,7 +9,7 @@ connection.on("error", (err) => console.error("[worker] redis error:", err.messa
 
 const worker = new Worker<AgentTask>(
   AGENT_TASKS_QUEUE,
-  // 占位执行器：Phase 2 在这里接入真正的 Agent 运行时（Vercel AI SDK 适配器 + MCP 工具）
+  // Placeholder executor: the real agent runtime (Vercel AI SDK adapter + MCP tools) plugs in here in Phase 2
   async (job) => {
     const { taskId, agentId, input } = job.data;
     console.log(`[worker] processing task ${taskId} for agent ${agentId}`);

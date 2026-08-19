@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** 控制面投递到执行面的任务载荷 */
+/** Task payload dispatched from the control plane to the execution plane. */
 export const AgentTaskSchema = z.object({
   taskId: z.string().min(1),
   agentId: z.string().min(1),

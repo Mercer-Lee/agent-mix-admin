@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    // TS6 过渡开关：tsup dts / Next 会在内部注入已弃用选项（baseUrl 等），TS 7.1 后移除
+    // TS6 transition switch: tsup dts / Next inject deprecated options (baseUrl etc.) internally; remove after TS 7.1
     "ignoreDeprecations": "6.0",
     "target": "ES2022",
     "lib": ["ES2022"],
