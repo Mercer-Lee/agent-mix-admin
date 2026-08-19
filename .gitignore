@@ -30,3 +30,7 @@ pnpm-debug.log*
 .codex
 .claude
 .agent*
+
+# local-only markdown docs — only README.md is shared via git
+*.md
+!README.md

@@ -30,7 +30,7 @@ pnpm dev                          # admin :3100 · server :3101 · agent-worker
 
 🚧 骨架已落地：pnpm workspace + Turborepo，`apps/admin`（Next.js 16 + antd 6 + Tailwind v4 工具类）、`apps/server`（NestJS 11，控制面）、`apps/agent-worker`（BullMQ 执行面）、`packages/core`（Agent Spec / Zod）、`packages/sdk`、`packages/ui`。全部可构建、类型检查通过、server/worker 冒烟启动正常。
 
-架构设计见 [docs/architecture.md](docs/architecture.md)。
+这个项目为什么存在、边界在哪里，见 [docs/vision.md](docs/vision.md)（愿景与缘起）；架构设计见 [docs/architecture.md](docs/architecture.md)。
 
 路线图：
 
