@@ -1,0 +1,5 @@
+/* 与 antd 共存：显式跳过 Tailwind preflight（样式重置会破坏 antd 组件样式），只保留主题变量与工具类。
+   勿改回 `@import "tailwindcss"` —— 那会重新引入 preflight。 */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
