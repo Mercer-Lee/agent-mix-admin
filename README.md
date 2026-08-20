@@ -22,7 +22,9 @@ Core pillars:
 
 ```bash
 corepack enable && pnpm install   # Node ≥22.13, pnpm ≥10
+cp .env.example .env             # set BOOTSTRAP_ADMIN_PASSWORD (12+ characters)
 docker compose up -d              # local Postgres + Redis
+pnpm db:migrate && pnpm db:seed   # schema + bootstrap administrator
 pnpm dev                          # admin :3100 · server :3101 · agent-worker
 ```
 
@@ -30,7 +32,7 @@ See [.env.example](.env.example) for the environment variable template. Control-
 
 ## Status
 
-🚧 Skeleton in place: pnpm workspace + Turborepo, with `apps/admin` (Next.js 16 + antd 6 + Tailwind v4 utilities), `apps/server` (NestJS 11, control plane), `apps/agent-worker` (BullMQ execution plane), `packages/core` (Agent Spec / Zod), `packages/sdk`, `packages/ui`. Everything builds, typechecks pass, and server/worker smoke-start cleanly.
+🚧 Phase 1A is in progress. The monorepo skeleton now includes a Drizzle/PostgreSQL control-plane schema, database-backed sessions, unified user/role/agent RBAC, audit events, a protected Admin login flow, and isolated integration tests. The model gateway and built-in chat Agent remain upcoming Phase 1 work.
 
 Roadmap:
 

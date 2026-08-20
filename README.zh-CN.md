@@ -22,7 +22,9 @@ Dify 们是「App 中心」——面向构建单个 AI 应用；AgentMix 是「�
 
 ```bash
 corepack enable && pnpm install   # Node ≥22.13，pnpm ≥10
+cp .env.example .env             # 设置 12 位以上的 BOOTSTRAP_ADMIN_PASSWORD
 docker compose up -d              # 本地 Postgres + Redis
+pnpm db:migrate && pnpm db:seed   # 初始化表结构与管理员
 pnpm dev                          # admin :3100 · server :3101 · agent-worker
 ```
 
@@ -30,7 +32,7 @@ pnpm dev                          # admin :3100 · server :3101 · agent-worker
 
 ## 状态
 
-🚧 骨架已落地：pnpm workspace + Turborepo，`apps/admin`（Next.js 16 + antd 6 + Tailwind v4 工具类）、`apps/server`（NestJS 11，控制面）、`apps/agent-worker`（BullMQ 执行面）、`packages/core`（Agent Spec / Zod）、`packages/sdk`、`packages/ui`。全部可构建、类型检查通过、server/worker 冒烟启动正常。
+🚧 Phase 1A 开发中：骨架之上已经加入 Drizzle/PostgreSQL 控制面数据模型、数据库 Session、user/role/agent 统一 RBAC、审计事件、受保护的 Admin 登录闭环和隔离数据库集成测试。模型网关和内置对话 Agent 仍属于后续 Phase 1 工作。
 
 这个项目为什么存在、边界在哪里，见 [docs/vision.md](docs/vision.md)（愿景与缘起）；架构设计见 [docs/architecture.md](docs/architecture.md)。
 
