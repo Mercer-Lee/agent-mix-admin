@@ -23,12 +23,17 @@ Core pillars:
 ```bash
 corepack enable && pnpm install   # Node ≥22.13, pnpm ≥10
 cp .env.example .env             # set BOOTSTRAP_ADMIN_PASSWORD (12+ characters)
-docker compose up -d              # local Postgres + Redis
 pnpm db:migrate && pnpm db:seed   # schema + bootstrap administrator
 pnpm dev                          # admin :3100 · server :3101 · agent-worker
 ```
 
-See [.env.example](.env.example) for the environment variable template. Control-plane health check: `curl localhost:3101/api/health`.
+For local development, prefer reusing PostgreSQL and Redis already installed on the host, and configure `DATABASE_URL` and `REDIS_URL` in `.env` accordingly. If either service is unavailable locally, start the containerized dependencies with the repository's Compose configuration:
+
+```bash
+docker compose up -d              # containerized Postgres + Redis
+```
+
+Docker Desktop includes the `docker compose` subcommand, so the legacy standalone `docker-compose` installation is not required. See [.env.example](.env.example) for the environment variable template. Control-plane health check: `curl localhost:3101/api/health`.
 
 ## Status
 

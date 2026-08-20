@@ -23,12 +23,17 @@ Dify 们是「App 中心」——面向构建单个 AI 应用；AgentMix 是「�
 ```bash
 corepack enable && pnpm install   # Node ≥22.13，pnpm ≥10
 cp .env.example .env             # 设置 12 位以上的 BOOTSTRAP_ADMIN_PASSWORD
-docker compose up -d              # 本地 Postgres + Redis
 pnpm db:migrate && pnpm db:seed   # 初始化表结构与管理员
 pnpm dev                          # admin :3100 · server :3101 · agent-worker
 ```
 
-环境变量模板见 [.env.example](.env.example)。控制面 API 健康检查：`curl localhost:3101/api/health`。
+本地开发优先复用本机已安装的 PostgreSQL 和 Redis，并在 `.env` 中配置对应的 `DATABASE_URL` 和 `REDIS_URL`。如果本机没有这两项服务，可使用仓库提供的 Compose 配置启动：
+
+```bash
+docker compose up -d              # 启动容器化的 Postgres + Redis
+```
+
+Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `docker-compose`。环境变量模板见 [.env.example](.env.example)。控制面 API 健康检查：`curl localhost:3101/api/health`。
 
 ## 状态
 
