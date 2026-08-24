@@ -3,7 +3,7 @@ import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import cookieParser from "cookie-parser";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
@@ -25,6 +25,7 @@ import {
 } from "./database/schema";
 import { AuthorizationService } from "./rbac/authorization.service";
 import { UsersService } from "./users/users.service";
+import { CapabilityExecutor } from "./capabilities/capability.executor";
 
 process.env.TESTCONTAINERS_RYUK_DISABLED = "true";
 
@@ -200,6 +201,101 @@ describe("Phase 1A control plane", () => {
 
     const authorization = app.get(AuthorizationService);
     await expect(authorization.hasPermissions(agentSubject[0]!.id, ["users:read", "roles:read"])).resolves.toBe(true);
+  });
+
+  it("discovers and executes users.search only for an authorized user-agent pair", async () => {
+    const adminUser = await database.db
+      .select({ id: users.subjectId })
+      .from(users)
+      .where(eq(users.username, "admin"))
+      .limit(1);
+    const usersReadPermission = await database.db
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(and(eq(permissions.resource, "users"), eq(permissions.action, "read")))
+      .limit(1);
+    const allowedAgentSubject = await database.db
+      .insert(subjects)
+      .values({ type: "agent" })
+      .returning({ id: subjects.id });
+    await database.db.insert(agents).values({
+      subjectId: allowedAgentSubject[0]!.id,
+      slug: "user-query-agent",
+      name: "User Query Agent",
+    });
+    await database.db.insert(subjectPermissions).values({
+      subjectId: allowedAgentSubject[0]!.id,
+      permissionId: usersReadPermission[0]!.id,
+    });
+
+    const capabilities = app.get(CapabilityExecutor);
+    const context = {
+      actorSubjectId: adminUser[0]!.id,
+      agentSubjectId: allowedAgentSubject[0]!.id,
+      traceId: "integration-users-search",
+      conversationId: "integration-conversation",
+    };
+    await expect(capabilities.listAvailable(context)).resolves.toEqual([
+      expect.objectContaining({
+        id: "users.search",
+        version: "1.0.0",
+        requiredPermissions: ["users:read"],
+      }),
+    ]);
+    const result = (await capabilities.execute("users.search", { search: "admin" }, context)) as {
+      items: Array<{ username: string }>;
+      total: number;
+      page: number;
+      pageSize: number;
+    };
+    expect(result).toMatchObject({ total: 1, page: 1, pageSize: 20 });
+    expect(result.items.map((item) => item.username)).toEqual(["admin"]);
+
+    const deniedAgentSubject = await database.db
+      .insert(subjects)
+      .values({ type: "agent" })
+      .returning({ id: subjects.id });
+    await database.db.insert(agents).values({
+      subjectId: deniedAgentSubject[0]!.id,
+      slug: "unprivileged-query-agent",
+      name: "Unprivileged Query Agent",
+    });
+    const deniedContext = { ...context, agentSubjectId: deniedAgentSubject[0]!.id };
+    await expect(capabilities.listAvailable(deniedContext)).resolves.toEqual([]);
+    await expect(capabilities.execute("users.search", {}, deniedContext)).rejects.toMatchObject({
+      code: "CAPABILITY_FORBIDDEN",
+    });
+
+    const capabilityAudits = await database.db
+      .select({
+        actorSubjectId: auditLogs.actorSubjectId,
+        action: auditLogs.action,
+        resourceId: auditLogs.resourceId,
+        metadata: auditLogs.metadata,
+      })
+      .from(auditLogs)
+      .where(eq(auditLogs.resourceType, "capability"));
+    expect(capabilityAudits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actorSubjectId: adminUser[0]!.id,
+          action: "capability.executed",
+          resourceId: "users.search",
+          metadata: expect.objectContaining({
+            agentSubjectId: allowedAgentSubject[0]!.id,
+            traceId: "integration-users-search",
+            input: { page: 1, pageSize: 20, search: "admin" },
+            output: { resultCount: 1, total: 1 },
+          }),
+        }),
+        expect.objectContaining({
+          actorSubjectId: adminUser[0]!.id,
+          action: "capability.authorization.denied",
+          resourceId: "users.search",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(capabilityAudits)).not.toContain("correct-horse-battery-staple");
   });
 
   it("enforces organization constraints, transaction rollback, and direct grants", async () => {

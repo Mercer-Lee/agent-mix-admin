@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    // TS6 transition switch: tsup dts / Next inject deprecated options (baseUrl etc.) internally; remove after TS 7.1
     "ignoreDeprecations": "6.0",
     "target": "ES2022",
     "lib": ["ES2022"],
