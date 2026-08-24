@@ -14,5 +14,6 @@
     "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "noEmit": false
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.integration.spec.ts", "src/**/*.e2e-spec.ts"]
 }

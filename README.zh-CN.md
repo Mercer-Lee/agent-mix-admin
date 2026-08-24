@@ -22,15 +22,22 @@ Dify 们是「App 中心」——面向构建单个 AI 应用；AgentMix 是「�
 
 ```bash
 corepack enable && pnpm install   # Node ≥22.13，pnpm ≥10
-docker compose up -d              # 本地 Postgres + Redis
+cp .env.example .env             # 设置 12 位以上的 BOOTSTRAP_ADMIN_PASSWORD
+pnpm db:migrate && pnpm db:seed   # 初始化表结构与管理员
 pnpm dev                          # admin :3100 · server :3101 · agent-worker
 ```
 
-环境变量模板见 [.env.example](.env.example)。控制面 API 健康检查：`curl localhost:3101/api/health`。
+本地开发优先复用本机已安装的 PostgreSQL 和 Redis，并在 `.env` 中配置对应的 `DATABASE_URL` 和 `REDIS_URL`。如果本机没有这两项服务，可使用仓库提供的 Compose 配置启动：
+
+```bash
+docker compose up -d              # 启动容器化的 Postgres + Redis
+```
+
+Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `docker-compose`。环境变量模板见 [.env.example](.env.example)。控制面 API 健康检查：`curl localhost:3101/api/health`。
 
 ## 状态
 
-🚧 骨架已落地：pnpm workspace + Turborepo，`apps/admin`（Next.js 16 + antd 6 + Tailwind v4 工具类）、`apps/server`（NestJS 11，控制面）、`apps/agent-worker`（BullMQ 执行面）、`packages/core`（Agent Spec / Zod）、`packages/sdk`、`packages/ui`。全部可构建、类型检查通过、server/worker 冒烟启动正常。
+🚧 Phase 1A 开发中：骨架之上已经加入 Drizzle/PostgreSQL 控制面数据模型、数据库 Session、user/role/agent 统一 RBAC、审计事件、受保护的 Admin 登录闭环和隔离数据库集成测试。模型网关和内置对话 Agent 仍属于后续 Phase 1 工作。
 
 这个项目为什么存在、边界在哪里，见 [docs/vision.md](docs/vision.md)（愿景与缘起）；架构设计见 [docs/architecture.md](docs/architecture.md)。
 

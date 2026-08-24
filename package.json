@@ -10,7 +10,12 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "db:generate": "pnpm --filter @agentmix/server db:generate",
+    "db:migrate": "pnpm --filter @agentmix/server db:migrate",
+    "db:seed": "pnpm --filter @agentmix/server db:seed",
+    "db:studio": "pnpm --filter @agentmix/server db:studio"
   },
   "devDependencies": {
     "turbo": "^2.10.10",

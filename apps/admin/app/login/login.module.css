@@ -1,0 +1,130 @@
+.shell {
+  --acid: #b8f500;
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1.35fr) minmax(22rem, 0.65fr);
+  overflow: hidden;
+  background: #090b0c;
+  color: #f4f4f5;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to right, black, transparent 78%);
+  pointer-events: none;
+}
+
+.statement {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(3rem, 8vw, 9rem);
+}
+
+.eyebrow,
+.panelHeader,
+.signal {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.eyebrow { color: #71717a; }
+
+.statement h1 {
+  max-width: 54rem;
+  margin: 1.8rem 0 0;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: clamp(3.3rem, 6vw, 7rem);
+  font-weight: 600;
+  letter-spacing: -0.065em;
+  line-height: 0.98;
+}
+
+.copy {
+  max-width: 34rem;
+  margin-top: 2rem;
+  color: #a1a1aa;
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.signal {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 4rem;
+  color: #71717a;
+}
+
+.signal span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--acid);
+  box-shadow: 0 0 22px rgba(184, 245, 0, 0.65);
+}
+
+.panel {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 18, 19, 0.94);
+  backdrop-filter: blur(24px);
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem 1.25rem;
+  color: #52525b;
+}
+
+.panelBody {
+  display: flex;
+  min-height: calc(100vh - 3rem);
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(2rem, 5vw, 5rem);
+}
+
+.mark {
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--acid) 50%, transparent);
+  background: color-mix(in srgb, var(--acid) 8%, transparent);
+  color: var(--acid);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-weight: 700;
+}
+
+.panelBody h2 {
+  margin: 2rem 0 0;
+  font-size: 1.85rem;
+  letter-spacing: -0.035em;
+}
+
+.panelBody > p {
+  margin: 0.7rem 0 2rem;
+  color: #71717a;
+}
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .statement { display: none; }
+  .panel { border-left: 0; }
+  .panelBody { max-width: 34rem; margin: 0 auto; }
+}

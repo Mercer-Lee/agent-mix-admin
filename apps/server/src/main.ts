@@ -1,12 +1,25 @@
 import "reflect-metadata";
+import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
+import type { Environment } from "./config/environment";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: true });
+  const config = app.get(ConfigService<Environment, true>);
+  app.use(cookieParser());
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  );
+  app.enableCors({
+    origin: config.get("ADMIN_ORIGIN", { infer: true }),
+    credentials: true,
+  });
+  app.enableShutdownHooks();
   app.setGlobalPrefix("api");
-  const port = Number(process.env.SERVER_PORT ?? 3101);
+  const port = config.get("SERVER_PORT", { infer: true });
   await app.listen(port);
   console.log(`[server] agentmix control-plane api listening on :${port}`);
 }
