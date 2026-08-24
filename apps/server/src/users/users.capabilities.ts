@@ -13,13 +13,13 @@ export const UsersSearchInputSchema = z
   .strict();
 
 const DepartmentSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   code: z.string(),
   name: z.string(),
 });
 
 const UserSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   username: z.string(),
   displayName: z.string(),
   email: z.string().nullable(),

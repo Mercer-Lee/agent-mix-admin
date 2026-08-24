@@ -17,8 +17,8 @@ export const CapabilityManifestSchema = z.object({
 });
 
 export const CapabilityExecutionContextSchema = z.object({
-  actorSubjectId: z.string().uuid(),
-  agentSubjectId: z.string().uuid(),
+  actorSubjectId: z.uuid(),
+  agentSubjectId: z.uuid(),
   traceId: z.string().trim().min(1).max(128),
   conversationId: z.string().trim().min(1).max(128).optional(),
 });
