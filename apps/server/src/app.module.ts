@@ -13,6 +13,7 @@ import { SessionAuthGuard } from "./auth/session-auth.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
 import { UsersModule } from "./users/users.module";
 import { RolesModule } from "./roles/roles.module";
+import { CapabilitiesModule } from "./capabilities/capabilities.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RolesModule } from "./roles/roles.module";
     AuditModule,
     RbacModule,
     AuthModule,
+    CapabilitiesModule,
     UsersModule,
     RolesModule,
   ],
