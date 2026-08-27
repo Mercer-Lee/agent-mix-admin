@@ -23,9 +23,9 @@ describe("LoginForm", () => {
     const user = userEvent.setup();
     render(<LoginForm />);
 
-    await user.type(screen.getByLabelText("用户名"), "admin");
-    await user.type(screen.getByLabelText("密码"), "correct-horse-battery-staple");
-    await user.click(screen.getByRole("button", { name: "验证身份并进入" }));
+    await user.type(screen.getByTestId("login-username"), "admin");
+    await user.type(screen.getByTestId("login-password"), "correct-horse-battery-staple");
+    await user.click(screen.getByTestId("login-submit"));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock).toHaveBeenCalledWith(
@@ -40,11 +40,11 @@ describe("LoginForm", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 401 }));
     render(<LoginForm />);
 
-    fireEvent.change(screen.getByLabelText("用户名"), { target: { value: "admin" } });
-    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "incorrect-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "验证身份并进入" }));
+    fireEvent.change(screen.getByTestId("login-username"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByTestId("login-password"), { target: { value: "incorrect-password" } });
+    fireEvent.click(screen.getByTestId("login-submit"));
 
-    expect(await screen.findByText("用户名或密码不正确。请输入后重试。")).toBeInTheDocument();
+    expect(await screen.findByTestId("login-error")).toBeVisible();
     expect(replace).not.toHaveBeenCalled();
   });
 });

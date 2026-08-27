@@ -52,6 +52,7 @@ describe("Phase 1A control plane", () => {
     const { AppModule } = await import("./app.module");
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication();
+    app.getHttpAdapter().getInstance().set("trust proxy", true);
     app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
@@ -296,6 +297,207 @@ describe("Phase 1A control plane", () => {
       ]),
     );
     expect(JSON.stringify(capabilityAudits)).not.toContain("correct-horse-battery-staple");
+  });
+
+  it("manages agents with atomic assignments, live capabilities, and audited authorization", async () => {
+    const admin = request.agent(app.getHttpServer());
+    await admin
+      .post("/api/auth/login")
+      .set("x-forwarded-for", "203.0.113.10")
+      .set("origin", "http://localhost:3100")
+      .send({ username: "admin", password: "correct-horse-battery-staple" })
+      .expect(200);
+
+    const permissionCatalog = await admin.get("/api/permissions").expect(200);
+    expect(permissionCatalog.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "agents:read" }),
+        expect.objectContaining({ key: "agents:assign-permissions" }),
+        expect.objectContaining({ key: "users:read" }),
+      ]),
+    );
+    const usersReadPermission = permissionCatalog.body.find(
+      (permission: { key: string }) => permission.key === "users:read",
+    ) as { id: string };
+    const agentsCreatePermission = permissionCatalog.body.find(
+      (permission: { key: string }) => permission.key === "agents:create",
+    ) as { id: string };
+
+    const creatorUser = await admin
+      .post("/api/users")
+      .set("origin", "http://localhost:3100")
+      .send({
+        username: "agent-creator",
+        password: "agent-creator-password",
+        displayName: "Agent Creator",
+      })
+      .expect(201);
+    await database.db.insert(subjectPermissions).values({
+      subjectId: creatorUser.body.id as string,
+      permissionId: agentsCreatePermission.id,
+    });
+    const creator = request.agent(app.getHttpServer());
+    await creator
+      .post("/api/auth/login")
+      .set("x-forwarded-for", "203.0.113.11")
+      .set("origin", "http://localhost:3100")
+      .send({ username: "agent-creator", password: "agent-creator-password" })
+      .expect(200);
+    await creator.get("/api/agents").expect(403);
+    await creator.get("/api/permissions").expect(403);
+    await creator
+      .post("/api/agents")
+      .set("origin", "http://localhost:3100")
+      .send({ slug: "blank-agent", name: "Blank Agent" })
+      .expect(201);
+
+    const beforeDeniedCreate = await database.db.select({ value: count() }).from(subjects);
+    await creator
+      .post("/api/agents")
+      .set("origin", "http://localhost:3100")
+      .send({
+        slug: "privilege-escalation-agent",
+        name: "Privilege Escalation Agent",
+        permissionIds: [usersReadPermission.id],
+      })
+      .expect(403);
+    const afterDeniedCreate = await database.db.select({ value: count() }).from(subjects);
+    expect(afterDeniedCreate[0]?.value).toBe(beforeDeniedCreate[0]?.value);
+
+    const invalidAssignmentId = "019d2f5b-a8ab-7000-8000-000000000099";
+    const beforeInvalidAssignment = await database.db.select({ value: count() }).from(subjects);
+    await admin
+      .post("/api/agents")
+      .set("origin", "http://localhost:3100")
+      .send({
+        slug: "invalid-role-agent",
+        name: "Invalid Role Agent",
+        roleIds: [invalidAssignmentId],
+      })
+      .expect(400);
+    const afterInvalidAssignment = await database.db.select({ value: count() }).from(subjects);
+    expect(afterInvalidAssignment[0]?.value).toBe(beforeInvalidAssignment[0]?.value);
+
+    const created = await admin
+      .post("/api/agents")
+      .set("origin", "http://localhost:3100")
+      .send({
+        slug: "directory-agent",
+        name: "Directory Agent",
+        description: "Searches the internal user directory.",
+        permissionIds: [usersReadPermission.id],
+      })
+      .expect(201);
+    expect(created.body).toMatchObject({
+      slug: "directory-agent",
+      name: "Directory Agent",
+      status: "active",
+      roles: [],
+      directPermissions: [expect.objectContaining({ key: "users:read" })],
+      effectivePermissions: ["users:read"],
+    });
+
+    const beforeDuplicate = await database.db.select({ value: count() }).from(subjects);
+    await admin
+      .post("/api/agents")
+      .set("origin", "http://localhost:3100")
+      .send({ slug: "directory-agent", name: "Duplicate Directory Agent" })
+      .expect(409);
+    const afterDuplicate = await database.db.select({ value: count() }).from(subjects);
+    expect(afterDuplicate[0]?.value).toBe(beforeDuplicate[0]?.value);
+    const listed = await admin.get("/api/agents?search=directory&status=active").expect(200);
+    expect(listed.body).toMatchObject({ total: 1, page: 1, pageSize: 20 });
+    expect(listed.body.items[0]).toMatchObject({ id: created.body.id, slug: "directory-agent" });
+
+    await admin
+      .put(`/api/agents/${created.body.id}`)
+      .set("origin", "http://localhost:3100")
+      .send({
+        name: "Should Roll Back",
+        description: "This update must not persist.",
+        status: "disabled",
+        roleIds: [],
+        permissionIds: [invalidAssignmentId],
+      })
+      .expect(400);
+    await admin.get(`/api/agents/${created.body.id}`).expect(200).expect(({ body }) => {
+      expect(body).toMatchObject({
+        name: "Directory Agent",
+        status: "active",
+        effectivePermissions: ["users:read"],
+      });
+    });
+
+    await admin
+      .get(`/api/agents/${created.body.id}/capabilities`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual([expect.objectContaining({ id: "users.search" })]);
+      });
+    await admin
+      .put(`/api/agents/${created.body.id}`)
+      .set("origin", "http://localhost:3100")
+      .send({
+        name: "Directory Agent (paused)",
+        description: "Temporarily disabled.",
+        status: "disabled",
+        roleIds: [],
+        permissionIds: [usersReadPermission.id],
+      })
+      .expect(200);
+    await admin.get(`/api/agents/${created.body.id}/capabilities`).expect(200, []);
+
+    await admin
+      .put(`/api/agents/${created.body.id}`)
+      .set("origin", "http://localhost:3100")
+      .send({
+        name: "Directory Agent",
+        description: "Searches the internal user directory.",
+        status: "active",
+        roleIds: [],
+        permissionIds: [],
+      })
+      .expect(200);
+    await admin.get(`/api/agents/${created.body.id}/capabilities`).expect(200, []);
+    await admin
+      .put(`/api/agents/${created.body.id}/permissions`)
+      .set("origin", "http://localhost:3100")
+      .send({ permissionIds: [usersReadPermission.id] })
+      .expect(204);
+    await admin
+      .get(`/api/agents/${created.body.id}/capabilities`)
+      .expect(200)
+      .expect(({ body }) => expect(body).toHaveLength(1));
+
+    const roleList = await admin.get("/api/roles").expect(200);
+    await admin
+      .put(`/api/agents/${created.body.id}/roles`)
+      .set("origin", "http://localhost:3100")
+      .send({ roleIds: [roleList.body[0].id] })
+      .expect(204);
+    await admin.get(`/api/agents/${created.body.id}`).expect(200).expect(({ body }) => {
+      expect(body.roles).toEqual([expect.objectContaining({ key: "super-admin" })]);
+      expect(body.effectivePermissions).toContain("agents:update");
+    });
+
+    const agentAudits = await database.db
+      .select({ action: auditLogs.action, resourceId: auditLogs.resourceId, metadata: auditLogs.metadata })
+      .from(auditLogs)
+      .where(eq(auditLogs.resourceType, "agent"));
+    expect(agentAudits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: "agent.created", resourceId: created.body.id }),
+        expect.objectContaining({ action: "agent.updated", resourceId: created.body.id }),
+        expect.objectContaining({ action: "agent.permissions.updated", resourceId: created.body.id }),
+        expect.objectContaining({ action: "agent.roles.updated", resourceId: created.body.id }),
+        expect.objectContaining({
+          action: "authorization.denied",
+          resourceId: "privilege-escalation-agent",
+          metadata: { requiredPermissions: ["agents:assign-permissions"] },
+        }),
+      ]),
+    );
+    expect(JSON.stringify(agentAudits)).not.toContain("agent-creator-password");
   });
 
   it("enforces organization constraints, transaction rollback, and direct grants", async () => {

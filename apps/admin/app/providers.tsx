@@ -2,11 +2,11 @@
 
 import type { ReactNode } from "react";
 import { ConfigProvider, theme as antdTheme } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import enUS from "antd/locale/en_US";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <ConfigProvider locale={zhCN} theme={{ algorithm: antdTheme.darkAlgorithm }}>
+    <ConfigProvider locale={enUS} theme={{ algorithm: antdTheme.darkAlgorithm }}>
       {children}
     </ConfigProvider>
   );

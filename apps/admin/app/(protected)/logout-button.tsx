@@ -20,8 +20,8 @@ export function LogoutButton() {
   }
 
   return (
-    <Button aria-label="退出登录" icon={<LogoutOutlined />} loading={loading} onClick={logout}>
-      退出
+    <Button aria-label="Sign out" icon={<LogoutOutlined />} loading={loading} onClick={logout}>
+      Sign out
     </Button>
   );
 }
