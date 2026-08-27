@@ -2,7 +2,7 @@ import { hash } from "@node-rs/argon2";
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Environment } from "../config/environment";
-import { PHASE_1A_PERMISSIONS } from "../rbac/permissions";
+import { CORE_PERMISSIONS } from "../rbac/permissions";
 import * as schema from "./schema";
 import { permissions, roles, subjectPermissions, subjectRoles, subjects, users } from "./schema";
 
@@ -20,8 +20,8 @@ export async function seedDatabase(
   }
 
   await db.transaction(async (tx) => {
-    await tx.insert(permissions).values([...PHASE_1A_PERMISSIONS]).onConflictDoNothing();
-    const permissionKeys = new Set(PHASE_1A_PERMISSIONS.map(({ resource, action }) => `${resource}:${action}`));
+    await tx.insert(permissions).values([...CORE_PERMISSIONS]).onConflictDoNothing();
+    const permissionKeys = new Set(CORE_PERMISSIONS.map(({ resource, action }) => `${resource}:${action}`));
     const allPermissionRows = (await tx
       .select({ id: permissions.id, resource: permissions.resource, action: permissions.action })
       .from(permissions))
@@ -38,7 +38,7 @@ export async function seedDatabase(
         subjectId: roleSubject[0]!.id,
         key: "super-admin",
         name: "超级管理员",
-        description: "System role with every permission registered in Phase 1A",
+        description: "System role with every permission registered in the open-source core",
         isSystem: true,
       });
       role = [{ id: roleSubject[0]!.id }];

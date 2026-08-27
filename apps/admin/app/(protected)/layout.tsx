@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthContext } from "../_lib/auth";
 import { LogoutButton } from "./logout-button";
@@ -10,7 +11,7 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
   return (
     <div className="min-h-screen bg-[#0a0c0d] text-zinc-100">
       <header className="border-b border-white/10 bg-[#0d1011]/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="grid h-9 w-9 place-items-center border border-[#b8f500]/50 bg-[#b8f500]/10 font-mono text-xs font-bold text-[#caff24]">
               AM
@@ -19,6 +20,22 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
               <p className="m-0 text-xs tracking-[0.24em] text-zinc-500 uppercase">Control Plane</p>
               <p className="m-0 text-sm font-semibold text-zinc-100">AgentMix Admin</p>
             </div>
+            <nav
+              className="ml-3 hidden items-center gap-1 border-l border-white/10 pl-5 md:flex"
+              aria-label="Main navigation"
+            >
+              <Link className="px-3 py-2 text-sm text-zinc-400 no-underline hover:text-[#caff24]" href="/">
+                Overview
+              </Link>
+              {auth.permissions.includes("agents:read") ? (
+                <Link
+                  className="px-3 py-2 text-sm text-zinc-400 no-underline hover:text-[#caff24]"
+                  href="/agents"
+                >
+                  Agent
+                </Link>
+              ) : null}
+            </nav>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden text-right sm:block">

@@ -14,6 +14,8 @@ import { PermissionsGuard } from "./auth/permissions.guard";
 import { UsersModule } from "./users/users.module";
 import { RolesModule } from "./roles/roles.module";
 import { CapabilitiesModule } from "./capabilities/capabilities.module";
+import { AgentsModule } from "./agents/agents.module";
+import { PermissionsModule } from "./permissions/permissions.module";
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { CapabilitiesModule } from "./capabilities/capabilities.module";
     RbacModule,
     AuthModule,
     CapabilitiesModule,
+    AgentsModule,
+    PermissionsModule,
     UsersModule,
     RolesModule,
   ],
