@@ -5,9 +5,9 @@ import { Card, Tag } from "antd";
 type Status = "ok" | "warn" | "down";
 
 const statusMeta: Record<Status, { color: string; text: string }> = {
-  ok: { color: "success", text: "正常" },
-  warn: { color: "warning", text: "注意" },
-  down: { color: "error", text: "异常" },
+  ok: { color: "success", text: "Operational" },
+  warn: { color: "warning", text: "Warning" },
+  down: { color: "error", text: "Down" },
 };
 
 export function StatusCard({
