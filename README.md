@@ -37,11 +37,17 @@ Docker Desktop includes the `docker compose` subcommand, so the legacy standalon
 
 ## Status
 
-🚧 Phase 1A is in progress. The monorepo skeleton now includes a Drizzle/PostgreSQL control-plane schema, database-backed sessions, unified user/role/agent RBAC, audit events, a protected Admin login flow, and isolated integration tests. The model gateway and built-in chat Agent remain upcoming Phase 1 work.
+🚧 Phase 1 is in progress. The first two control-plane milestones are complete:
+
+- [x] **Phase 1A — Control-plane foundation:** Drizzle/PostgreSQL schema, database-backed sessions, unified user/role/agent RBAC, audit events, protected Admin authentication, and isolated integration tests.
+- [x] **Phase 1B — Governed Agent resources:** Capability Registry and executor, the `users.search` vertical slice, Agent CRUD and status management, role/direct-permission assignment, live capability discovery, and the Admin Agent management UI.
+- [ ] **Next — AI runtime entry point:** model configuration and the built-in chat Agent, while preserving the control-plane/execution-plane boundary.
+
+MCP transport, asynchronous worker execution, approval flows, and versioned Agent releases remain later milestones.
 
 Roadmap:
 
-- [ ] Phase 1 "RuoYi with AI": RBAC + org structure + audit + model config + built-in chat Agent
+- [ ] Phase 1 "RuoYi with AI": control-plane foundation and governed Agent management are complete; model config + built-in chat Agent remain
 - [ ] Phase 2 "Agents as resources": declarative agent definitions + MCP tool registry + versioned releases + HITL approvals
 - [ ] Phase 3 "Enterprise depth": cost allocation + evals + knowledge-base plugin + OIDC
 

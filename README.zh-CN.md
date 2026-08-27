@@ -37,13 +37,19 @@ Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `
 
 ## 状态
 
-🚧 Phase 1A 开发中：骨架之上已经加入 Drizzle/PostgreSQL 控制面数据模型、数据库 Session、user/role/agent 统一 RBAC、审计事件、受保护的 Admin 登录闭环和隔离数据库集成测试。模型网关和内置对话 Agent 仍属于后续 Phase 1 工作。
+🚧 Phase 1 进行中，前两个控制面里程碑已经完成：
+
+- [x] **Phase 1A — 控制面基础：** Drizzle/PostgreSQL 数据模型、数据库 Session、user/role/agent 统一 RBAC、审计事件、受保护的 Admin 登录闭环和隔离数据库集成测试。
+- [x] **Phase 1B — 受治理的 Agent 资源：** Capability Registry 与统一执行器、`users.search` 纵向样板、Agent CRUD 与状态管理、角色/直接权限分配、实时 Capability 发现和 Admin Agent 管理界面。
+- [ ] **下一步 — AI Runtime 入口：** 模型配置和内置对话 Agent，同时继续保持控制面与执行面分离。
+
+MCP 传输层、异步 Worker 执行、审批流和 Agent 版本发布仍属于后续里程碑。
 
 这个项目为什么存在、边界在哪里，见 [docs/vision.md](docs/vision.md)（愿景与缘起）；架构设计见 [docs/architecture.md](docs/architecture.md)。
 
 路线图：
 
-- [ ] Phase 1「带 AI 的若依」：RBAC + 组织 + 审计 + 模型配置 + 内置对话 Agent
+- [ ] Phase 1「带 AI 的若依」：控制面基础和 Agent 管理已完成，模型配置 + 内置对话 Agent 待完成
 - [ ] Phase 2「Agent 资源化」：声明式 Agent 定义 + MCP 工具注册 + 版本发布 + HITL 审批
 - [ ] Phase 3「企业深化」：成本分摊 + 评测 + 知识库插件 + OIDC
 
