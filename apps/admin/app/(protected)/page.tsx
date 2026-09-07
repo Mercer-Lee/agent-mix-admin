@@ -1,26 +1,79 @@
-import { StatusCard } from "@agentmix/ui";
 import { getAuthContext } from "../_lib/auth";
+import { StatusCard, type HealthStatus } from "./_components/status-card";
+
+interface HealthResponse {
+  status?: "ok" | "warn" | "down";
+  service?: string;
+  database?: "ok" | "down" | { status?: "ok" | "down" };
+  redis?: "ok" | "down" | { status?: "ok" | "down" };
+  worker?: { status?: "ok" | "warn" | "unknown"; count?: number | null };
+  uptime?: number;
+}
+
+function dependencyStatus(value: HealthResponse["database"]): HealthStatus {
+  const status = typeof value === "string" ? value : value?.status;
+  if (status === "ok" || status === "down") return status;
+  return "unknown";
+}
+
+async function getHealth(): Promise<HealthResponse | null> {
+  try {
+    const response = await fetch(
+      `${process.env.SERVER_INTERNAL_URL ?? "http://localhost:3101"}/api/health`,
+      { cache: "no-store", headers: { accept: "application/json" } },
+    );
+    const health = (await response.json()) as HealthResponse;
+    return health?.status ? health : null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function HomePage() {
-  const auth = await getAuthContext();
+  const [auth, health] = await Promise.all([getAuthContext(), getHealth()]);
+  const workerCount = health?.worker?.count;
+  const workerStatus: HealthStatus =
+    !health?.worker || health.worker.status === "unknown" || workerCount === null || workerCount === undefined
+      ? "unknown"
+      : workerCount === 0 || health.worker.status === "warn"
+        ? "warn"
+        : health.worker.status === "ok"
+          ? "ok"
+          : "unknown";
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
       <div className="grid gap-8 lg:grid-cols-[1fr_19rem]">
         <section>
-          <p className="font-mono text-xs tracking-[0.28em] text-[#b8f500] uppercase">System ready / 01</p>
+          <p className="font-mono text-xs tracking-[0.28em] text-[#b8f500] uppercase">Control plane / live status</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
             Govern agents like every other critical enterprise resource.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400">
-            The control plane now defines identity, session, permission, and capability boundaries. Create
-            agents and inspect their effective capabilities in the current user context.
+            The control plane defines identity, authorization, runtime and audit boundaries. Health signals below
+            are read from the live server rather than assumed from configuration.
           </p>
 
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatusCard title="server (NestJS)" status="ok" detail=":3101/api/health" />
-            <StatusCard title="authorization" status="ok" detail="subject → role → permission" />
-            <StatusCard title="agent-worker" status="ok" detail="queue: agent-tasks" />
+            <StatusCard
+              title="database / PostgreSQL"
+              status={health ? dependencyStatus(health.database) : "unknown"}
+              detail={health ? "Control-plane persistence" : "Health endpoint unavailable"}
+            />
+            <StatusCard
+              title="event bus / Redis"
+              status={health ? dependencyStatus(health.redis) : "unknown"}
+              detail="Run tasks, events and cancellation"
+            />
+            <StatusCard
+              title="agent runtime"
+              status={workerStatus}
+              detail={
+                typeof workerCount === "number"
+                  ? `${workerCount} worker${workerCount === 1 ? "" : "s"} registered`
+                  : "Worker presence cannot be determined"
+              }
+            />
           </div>
         </section>
 

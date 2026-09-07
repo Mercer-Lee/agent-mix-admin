@@ -4,6 +4,7 @@ export interface AgentSummary {
   name: string;
   description: string;
   status: "active" | "disabled";
+  isSystem?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,36 @@ export interface PermissionOption {
   description: string;
 }
 
+export interface UserOption {
+  id: string;
+  username: string;
+  displayName: string;
+  status?: "active" | "disabled";
+}
+
+export interface UserListResponse {
+  items: UserOption[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface DepartmentOption {
+  id: string;
+  code: string;
+  name: string;
+  parentId?: string | null;
+  status?: "active" | "disabled";
+}
+
+export interface ModelProfileOption {
+  id: string;
+  key: string;
+  name: string;
+  modelId: string;
+  status: "active" | "disabled";
+}
+
 export interface AgentDetail extends AgentSummary {
   roles: Array<Pick<RoleOption, "id" | "key" | "name">>;
   directPermissions: PermissionOption[];
@@ -46,18 +77,50 @@ export interface CapabilityDescriptor {
   requiredPermissions: string[];
 }
 
-export interface AgentMutationInput {
+export interface AgentProfileMutationInput {
   slug?: string;
   name: string;
   description: string;
   status?: "active" | "disabled";
-  roleIds: string[];
-  permissionIds: string[];
 }
 
-export interface AgentAccess {
+export interface AgentRuntime {
+  agentId: string;
+  configured: boolean;
+  modelProfileId: string | null;
+  systemPrompt: string;
+  maxOutputTokens: number;
+  modelProfile: ModelProfileOption | null;
+  updatedAt: string | null;
+}
+
+export interface AgentRuntimeMutationInput {
+  modelProfileId: string;
+  systemPrompt: string;
+  maxOutputTokens: number;
+}
+
+export interface AgentInvocationAccess {
+  agentId: string;
+  users: UserOption[];
+  roles: Array<Pick<RoleOption, "id" | "key" | "name">>;
+  departments: Array<Pick<DepartmentOption, "id" | "code" | "name"> & { includeDescendants: boolean }>;
+}
+
+export interface AgentInvocationAccessInput {
+  userIds: string[];
+  roleIds: string[];
+  departments: Array<{ departmentId: string; includeDescendants: boolean }>;
+}
+
+export interface AgentManagerAccess {
   canCreate: boolean;
+  canUpdateProfile: boolean;
   canAssignRoles: boolean;
   canAssignPermissions: boolean;
-  canUpdateAll: boolean;
+  canConfigureRuntime: boolean;
+  canAssignAccess: boolean;
+  canReadUsers: boolean;
+  canReadRoles: boolean;
+  canReadDepartments: boolean;
 }

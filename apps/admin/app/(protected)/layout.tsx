@@ -8,10 +8,24 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
   const auth = await getAuthContext();
   if (!auth) redirect("/login");
 
+  const navigation = [
+    { href: "/", label: "Overview", visible: true },
+    { href: "/models", label: "Models", visible: auth.permissions.includes("models:read") },
+    { href: "/agents", label: "Agents", visible: auth.permissions.includes("agents:read") },
+    { href: "/chat", label: "Workbench", visible: auth.permissions.includes("agents:invoke") },
+    {
+      href: "/audit",
+      label: "Audit",
+      visible:
+        auth.permissions.includes("audit-logs:read") ||
+        auth.permissions.includes("conversations:audit"),
+    },
+  ].filter((item) => item.visible);
+
   return (
-    <div className="min-h-screen bg-[#0a0c0d] text-zinc-100">
-      <header className="border-b border-white/10 bg-[#0d1011]/95">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <div className="flex min-h-dvh flex-col bg-[#0a0c0d] text-zinc-100">
+      <header className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-[#0d1011]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-4">
             <div className="grid h-9 w-9 place-items-center border border-[#b8f500]/50 bg-[#b8f500]/10 font-mono text-xs font-bold text-[#caff24]">
               AM
@@ -24,17 +38,15 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
               className="ml-3 hidden items-center gap-1 border-l border-white/10 pl-5 md:flex"
               aria-label="Main navigation"
             >
-              <Link className="px-3 py-2 text-sm text-zinc-400 no-underline hover:text-[#caff24]" href="/">
-                Overview
-              </Link>
-              {auth.permissions.includes("agents:read") ? (
+              {navigation.map((item) => (
                 <Link
+                  key={item.href}
                   className="px-3 py-2 text-sm text-zinc-400 no-underline hover:text-[#caff24]"
-                  href="/agents"
+                  href={item.href}
                 >
-                  Agent
+                  {item.label}
                 </Link>
-              ) : null}
+              ))}
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -45,6 +57,20 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
             <LogoutButton />
           </div>
         </div>
+        <nav
+          className="mx-auto flex max-w-7xl gap-1 overflow-x-auto border-t border-white/5 px-4 py-2 md:hidden"
+          aria-label="Mobile navigation"
+        >
+          {navigation.map((item) => (
+            <Link
+              key={item.href}
+              className="shrink-0 px-3 py-1.5 font-mono text-xs tracking-wide text-zinc-400 no-underline hover:text-[#caff24]"
+              href={item.href}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </header>
       {children}
     </div>

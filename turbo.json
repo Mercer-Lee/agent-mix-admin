@@ -13,9 +13,13 @@
       "cache": false,
       "persistent": true
     },
-    "test": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
     "test:integration": {
-      "cache": false
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["TEST_POSTGRES_IMAGE", "TEST_REDIS_IMAGE"]
     }
   }
 }

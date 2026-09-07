@@ -1,39 +1,11 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import { z } from "zod";
+import { UsersSearchInputV1Schema, UsersSearchOutputV1Schema } from "@agentmix/core";
 import { CapabilityRegistry } from "../capabilities/capability.registry";
 import { defineCapability } from "../capabilities/capability.types";
 import { UsersService } from "./users.service";
 
-export const UsersSearchInputSchema = z
-  .object({
-    page: z.number().int().min(1).default(1),
-    pageSize: z.number().int().min(1).max(100).default(20),
-    search: z.string().trim().max(80).optional(),
-  })
-  .strict();
-
-const DepartmentSummarySchema = z.object({
-  id: z.uuid(),
-  code: z.string(),
-  name: z.string(),
-});
-
-const UserSummarySchema = z.object({
-  id: z.uuid(),
-  username: z.string(),
-  displayName: z.string(),
-  email: z.string().nullable(),
-  status: z.enum(["active", "disabled"]),
-  department: DepartmentSummarySchema.nullable(),
-  createdAt: z.string().datetime(),
-});
-
-export const UsersSearchOutputSchema = z.object({
-  items: z.array(UserSummarySchema),
-  total: z.number().int().min(0),
-  page: z.number().int().min(1),
-  pageSize: z.number().int().min(1).max(100),
-});
+export const UsersSearchInputSchema = UsersSearchInputV1Schema;
+export const UsersSearchOutputSchema = UsersSearchOutputV1Schema;
 
 @Injectable()
 export class UsersCapabilities implements OnModuleInit {
@@ -60,7 +32,7 @@ export class UsersCapabilities implements OnModuleInit {
           input: (input) => ({
             page: input.page,
             pageSize: input.pageSize,
-            search: input.search ?? null,
+            hasSearch: Boolean(input.search),
           }),
           output: (output) => ({
             resultCount: output.items.length,
