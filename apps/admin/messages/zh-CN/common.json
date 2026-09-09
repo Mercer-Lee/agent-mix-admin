@@ -1,0 +1,78 @@
+{
+  "app": {
+    "meta": {
+      "title": "AgentMix Admin",
+      "description": "企业级管理与 Agent 治理框架"
+    },
+    "brand": {
+      "eyebrow": "控制面",
+      "name": "AgentMix Admin"
+    },
+    "nav": {
+      "overview": "总览",
+      "models": "模型",
+      "agents": "Agent",
+      "workbench": "工作台",
+      "audit": "审计"
+    },
+    "navAria": "主导航",
+    "trigger": {
+      "open": "打开导航",
+      "expand": "展开导航",
+      "collapse": "收起导航"
+    },
+    "language": "语言",
+    "signOut": "退出登录"
+  },
+  "overview": {
+    "eyebrow": "控制面 / 实时状态",
+    "headline": "像管理其他关键企业资源一样治理 Agent。",
+    "intro": "控制面定义身份、授权、运行时与审计边界。以下健康信号直接读取自运行中的服务，而非来自配置假设。",
+    "postgresTitle": "数据库 / PostgreSQL",
+    "postgresDetail": "控制面持久化存储",
+    "healthUnavailable": "健康检查端点不可用",
+    "redisTitle": "事件总线 / Redis",
+    "redisDetail": "运行任务、事件与取消",
+    "runtimeTitle": "Agent 运行时",
+    "workerCount": "{count, plural, other {已注册 # 个 worker}}",
+    "workerUnknown": "无法确定 worker 状态",
+    "activeSubject": "当前主体",
+    "roles": "角色",
+    "effectivePermissions": "{count, plural, other {共 # 项有效权限}}"
+  },
+  "statusCard": {
+    "status": {
+      "ok": "正常",
+      "warn": "告警",
+      "down": "宕机",
+      "unknown": "未知"
+    }
+  },
+  "login": {
+    "eyebrow": "AgentMix / 企业控制面",
+    "headline1": "治理优先。",
+    "headline2": "Agent 就绪，面向企业。",
+    "copy": "身份、角色、工具访问与成本，统一回归可验证的治理边界。",
+    "signal": "控制面在线",
+    "panelAria": "AgentMix 登录",
+    "authTag": "认证 / 01",
+    "sessionTag": "会话：12 小时",
+    "enterHeading": "进入管理控制台",
+    "enterHint": "使用管理员分配的内部账号登录。",
+    "usernameLabel": "用户名",
+    "usernameRequired": "请输入用户名",
+    "passwordLabel": "密码",
+    "passwordRequired": "请输入密码",
+    "passwordMin": "密码至少需要 12 个字符",
+    "submit": "验证身份并进入",
+    "rateLimited": "登录尝试过于频繁，请稍后再试。",
+    "invalidCredentials": "用户名或密码不正确。",
+    "serviceUnavailable": "认证服务暂时不可用。"
+  },
+  "errors": {
+    "title": "页面加载失败",
+    "subTitleWithDigest": "请求失败并被终止。参考编号：{digest}",
+    "subTitle": "控制面拒绝了该请求或请求执行失败。请重试，或返回可访问的页面。",
+    "tryAgain": "重试"
+  }
+}

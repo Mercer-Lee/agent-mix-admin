@@ -12,16 +12,25 @@ import { CapabilityExecutor } from "../capabilities/capability.executor";
 import { DatabaseService } from "../database/database.service";
 import {
   agents,
+  agentDepartmentAccessGrants,
+  agentRoleAccessGrants,
+  agentRuntimes,
+  agentUserAccessGrants,
+  departments,
+  modelProfiles,
   permissions,
   roles,
   subjectPermissions,
   subjectRoles,
   subjects,
+  users,
 } from "../database/schema";
 import { AuthorizationService } from "../rbac/authorization.service";
 import type { CreateAgentDto } from "./dto/create-agent.dto";
 import type { ListAgentsDto } from "./dto/list-agents.dto";
 import type { UpdateAgentDto } from "./dto/update-agent.dto";
+import type { UpdateAgentAccessDto } from "./dto/update-agent-access.dto";
+import type { UpdateAgentRuntimeDto } from "./dto/update-agent-runtime.dto";
 
 interface ActorMetadata {
   actorSubjectId: string;
@@ -59,6 +68,7 @@ export class AgentsService {
           slug: agents.slug,
           name: agents.name,
           description: agents.description,
+          isSystem: agents.isSystem,
           status: subjects.status,
           createdAt: agents.createdAt,
           updatedAt: agents.updatedAt,
@@ -95,6 +105,7 @@ export class AgentsService {
         slug: agents.slug,
         name: agents.name,
         description: agents.description,
+        isSystem: agents.isSystem,
         status: subjects.status,
         createdAt: agents.createdAt,
         updatedAt: agents.updatedAt,
@@ -148,15 +159,18 @@ export class AgentsService {
           description: dto.description,
         });
         await this.replaceAssignments(tx, id, dto.roleIds, dto.permissionIds);
+        await this.audit.record(
+          {
+            ...actor,
+            action: "agent.created",
+            resourceType: "agent",
+            resourceId: id,
+            outcome: "success",
+            metadata: { slug: dto.slug, roleIds: dto.roleIds, permissionIds: dto.permissionIds },
+          },
+          tx,
+        );
         return id;
-      });
-      await this.audit.record({
-        ...actor,
-        action: "agent.created",
-        resourceType: "agent",
-        resourceId: agentId,
-        outcome: "success",
-        metadata: { slug: dto.slug, roleIds: dto.roleIds, permissionIds: dto.permissionIds },
       });
       return this.getById(agentId);
     } catch (error) {
@@ -194,7 +208,6 @@ export class AgentsService {
   async update(agentId: string, dto: UpdateAgentDto, actor: ActorMetadata) {
     await this.database.db.transaction(async (tx) => {
       await this.ensureAgent(tx, agentId);
-      await this.validateAssignments(tx, dto.roleIds, dto.permissionIds);
       const now = new Date();
       await Promise.all([
         tx.update(subjects).set({ status: dto.status, updatedAt: now }).where(eq(subjects.id, agentId)),
@@ -203,19 +216,19 @@ export class AgentsService {
           .set({ name: dto.name, description: dto.description, updatedAt: now })
           .where(eq(agents.subjectId, agentId)),
       ]);
-      await this.replaceAssignments(tx, agentId, dto.roleIds, dto.permissionIds);
-    });
-    await this.audit.record({
-      ...actor,
-      action: "agent.updated",
-      resourceType: "agent",
-      resourceId: agentId,
-      outcome: "success",
-      metadata: {
-        status: dto.status,
-        roleIds: dto.roleIds,
-        permissionIds: dto.permissionIds,
-      },
+      await this.audit.record(
+        {
+          ...actor,
+          action: "agent.updated",
+          resourceType: "agent",
+          resourceId: agentId,
+          outcome: "success",
+          metadata: {
+            status: dto.status,
+          },
+        },
+        tx,
+      );
     });
     return this.getById(agentId);
   }
@@ -228,14 +241,17 @@ export class AgentsService {
       if (roleIds.length) {
         await tx.insert(subjectRoles).values(roleIds.map((roleId) => ({ subjectId: agentId, roleId })));
       }
-    });
-    await this.audit.record({
-      ...actor,
-      action: "agent.roles.updated",
-      resourceType: "agent",
-      resourceId: agentId,
-      outcome: "success",
-      metadata: { roleIds },
+      await this.audit.record(
+        {
+          ...actor,
+          action: "agent.roles.updated",
+          resourceType: "agent",
+          resourceId: agentId,
+          outcome: "success",
+          metadata: { roleIds },
+        },
+        tx,
+      );
     });
   }
 
@@ -253,15 +269,227 @@ export class AgentsService {
           .insert(subjectPermissions)
           .values(permissionIds.map((permissionId) => ({ subjectId: agentId, permissionId })));
       }
+      await this.audit.record(
+        {
+          ...actor,
+          action: "agent.permissions.updated",
+          resourceType: "agent",
+          resourceId: agentId,
+          outcome: "success",
+          metadata: { permissionIds },
+        },
+        tx,
+      );
     });
-    await this.audit.record({
-      ...actor,
-      action: "agent.permissions.updated",
-      resourceType: "agent",
-      resourceId: agentId,
-      outcome: "success",
-      metadata: { permissionIds },
+  }
+
+  async getRuntime(agentId: string) {
+    await this.getById(agentId);
+    const rows = await this.database.db
+      .select({
+        agentId: agentRuntimes.agentSubjectId,
+        modelProfileId: agentRuntimes.modelProfileId,
+        systemPrompt: agentRuntimes.systemPrompt,
+        maxOutputTokens: agentRuntimes.maxOutputTokens,
+        updatedAt: agentRuntimes.updatedAt,
+        profileId: modelProfiles.id,
+        profileKey: modelProfiles.key,
+        profileName: modelProfiles.name,
+        profileModelId: modelProfiles.modelId,
+        profileStatus: modelProfiles.status,
+      })
+      .from(agentRuntimes)
+      .innerJoin(modelProfiles, eq(agentRuntimes.modelProfileId, modelProfiles.id))
+      .where(eq(agentRuntimes.agentSubjectId, agentId))
+      .limit(1);
+    const runtime = rows[0];
+    if (!runtime) {
+      return {
+        agentId,
+        configured: false,
+        modelProfileId: null,
+        systemPrompt: "",
+        maxOutputTokens: 2_048,
+        modelProfile: null,
+        updatedAt: null,
+      };
+    }
+    return {
+      agentId,
+      configured: true,
+      modelProfileId: runtime.modelProfileId,
+      systemPrompt: runtime.systemPrompt,
+      maxOutputTokens: runtime.maxOutputTokens,
+      modelProfile: {
+        id: runtime.profileId,
+        key: runtime.profileKey,
+        name: runtime.profileName,
+        modelId: runtime.profileModelId,
+        status: runtime.profileStatus,
+      },
+      updatedAt: runtime.updatedAt.toISOString(),
+    };
+  }
+
+  async updateRuntime(agentId: string, dto: UpdateAgentRuntimeDto, actor: ActorMetadata) {
+    await this.database.db.transaction(async (tx) => {
+      await this.ensureAgent(tx, agentId);
+      const profile = await tx
+        .select({ id: modelProfiles.id })
+        .from(modelProfiles)
+        .where(eq(modelProfiles.id, dto.modelProfileId))
+        .limit(1);
+      if (!profile[0]) throw new BadRequestException("Invalid model profile");
+      const now = new Date();
+      await tx
+        .insert(agentRuntimes)
+        .values({
+          agentSubjectId: agentId,
+          modelProfileId: dto.modelProfileId,
+          systemPrompt: dto.systemPrompt,
+          maxOutputTokens: dto.maxOutputTokens,
+          maxSteps: 5,
+        })
+        .onConflictDoUpdate({
+          target: agentRuntimes.agentSubjectId,
+          set: {
+            modelProfileId: dto.modelProfileId,
+            systemPrompt: dto.systemPrompt,
+            maxOutputTokens: dto.maxOutputTokens,
+            maxSteps: 5,
+            updatedAt: now,
+          },
+        });
+      await this.audit.record(
+        {
+          ...actor,
+          action: "agent.runtime.updated",
+          resourceType: "agent",
+          resourceId: agentId,
+          outcome: "success",
+          metadata: { modelProfileId: dto.modelProfileId, maxOutputTokens: dto.maxOutputTokens },
+        },
+        tx,
+      );
     });
+    return this.getRuntime(agentId);
+  }
+
+  async getAccess(agentId: string) {
+    await this.getById(agentId);
+    const [userRows, roleRows, departmentRows] = await Promise.all([
+      this.database.db
+        .select({ id: users.subjectId, username: users.username, displayName: users.displayName })
+        .from(agentUserAccessGrants)
+        .innerJoin(users, eq(agentUserAccessGrants.userSubjectId, users.subjectId))
+        .where(eq(agentUserAccessGrants.agentSubjectId, agentId)),
+      this.database.db
+        .select({ id: roles.subjectId, key: roles.key, name: roles.name })
+        .from(agentRoleAccessGrants)
+        .innerJoin(roles, eq(agentRoleAccessGrants.roleSubjectId, roles.subjectId))
+        .where(eq(agentRoleAccessGrants.agentSubjectId, agentId)),
+      this.database.db
+        .select({
+          id: departments.id,
+          code: departments.code,
+          name: departments.name,
+          includeDescendants: agentDepartmentAccessGrants.includeDescendants,
+        })
+        .from(agentDepartmentAccessGrants)
+        .innerJoin(departments, eq(agentDepartmentAccessGrants.departmentId, departments.id))
+        .where(eq(agentDepartmentAccessGrants.agentSubjectId, agentId)),
+    ]);
+    return { agentId, users: userRows, roles: roleRows, departments: departmentRows };
+  }
+
+  async updateAccess(agentId: string, dto: UpdateAgentAccessDto, actor: ActorMetadata) {
+    const departmentIds = dto.departments.map((grant) => grant.departmentId);
+    if (new Set(departmentIds).size !== departmentIds.length) {
+      throw new BadRequestException("Duplicate department grant");
+    }
+    await this.database.db.transaction(async (tx) => {
+      await this.ensureAgent(tx, agentId);
+      const [validUsers, validRoles, validDepartments] = await Promise.all([
+        dto.userIds.length
+          ? tx
+              .select({ id: users.subjectId })
+              .from(users)
+              .innerJoin(subjects, eq(users.subjectId, subjects.id))
+              .where(and(inArray(users.subjectId, dto.userIds), eq(subjects.status, "active")))
+          : Promise.resolve([]),
+        dto.roleIds.length
+          ? tx
+              .select({ id: roles.subjectId })
+              .from(roles)
+              .innerJoin(subjects, eq(roles.subjectId, subjects.id))
+              .where(and(inArray(roles.subjectId, dto.roleIds), eq(subjects.status, "active")))
+          : Promise.resolve([]),
+        departmentIds.length
+          ? tx
+              .select({ id: departments.id })
+              .from(departments)
+              .where(and(inArray(departments.id, departmentIds), eq(departments.status, "active")))
+          : Promise.resolve([]),
+      ]);
+      if (
+        validUsers.length !== dto.userIds.length ||
+        validRoles.length !== dto.roleIds.length ||
+        validDepartments.length !== departmentIds.length
+      ) {
+        throw new BadRequestException("One or more access grants are invalid");
+      }
+      await Promise.all([
+        tx.delete(agentUserAccessGrants).where(eq(agentUserAccessGrants.agentSubjectId, agentId)),
+        tx.delete(agentRoleAccessGrants).where(eq(agentRoleAccessGrants.agentSubjectId, agentId)),
+        tx
+          .delete(agentDepartmentAccessGrants)
+          .where(eq(agentDepartmentAccessGrants.agentSubjectId, agentId)),
+      ]);
+      if (dto.userIds.length) {
+        await tx.insert(agentUserAccessGrants).values(
+          dto.userIds.map((userSubjectId) => ({
+            agentSubjectId: agentId,
+            userSubjectId,
+            createdBySubjectId: actor.actorSubjectId,
+          })),
+        );
+      }
+      if (dto.roleIds.length) {
+        await tx.insert(agentRoleAccessGrants).values(
+          dto.roleIds.map((roleSubjectId) => ({
+            agentSubjectId: agentId,
+            roleSubjectId,
+            createdBySubjectId: actor.actorSubjectId,
+          })),
+        );
+      }
+      if (dto.departments.length) {
+        await tx.insert(agentDepartmentAccessGrants).values(
+          dto.departments.map((grant) => ({
+            agentSubjectId: agentId,
+            departmentId: grant.departmentId,
+            includeDescendants: grant.includeDescendants,
+            createdBySubjectId: actor.actorSubjectId,
+          })),
+        );
+      }
+      await this.audit.record(
+        {
+          ...actor,
+          action: "agent.access.updated",
+          resourceType: "agent",
+          resourceId: agentId,
+          outcome: "success",
+          metadata: {
+            userIds: dto.userIds,
+            roleIds: dto.roleIds,
+            departments: dto.departments,
+          },
+        },
+        tx,
+      );
+    });
+    return this.getAccess(agentId);
   }
 
   async listCapabilities(agentId: string, context: CapabilityExecutionContext) {

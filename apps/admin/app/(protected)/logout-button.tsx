@@ -2,10 +2,12 @@
 
 import { LogoutOutlined } from "@ant-design/icons";
 import { Button } from "antd";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function LogoutButton() {
+  const t = useTranslations("app");
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -20,8 +22,8 @@ export function LogoutButton() {
   }
 
   return (
-    <Button aria-label="Sign out" icon={<LogoutOutlined />} loading={loading} onClick={logout}>
-      Sign out
+    <Button aria-label={t("signOut")} icon={<LogoutOutlined />} loading={loading} onClick={logout}>
+      {t("signOut")}
     </Button>
   );
 }

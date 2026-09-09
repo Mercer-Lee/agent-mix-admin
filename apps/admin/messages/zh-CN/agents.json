@@ -1,0 +1,159 @@
+{
+  "page": {
+    "eyebrow": "受治理资源 / Agent",
+    "title": "Agent 管理",
+    "intro": "Agent 的身份、授权、运行时与调用授权拥有独立的保存边界。执行始终受当前操作者与不可变运行快照约束。",
+    "create": "创建 Agent"
+  },
+  "filters": {
+    "searchAria": "搜索 Agent",
+    "searchPlaceholder": "按名称或 Slug 搜索",
+    "statusAria": "按状态筛选",
+    "allStatuses": "全部状态",
+    "apply": "应用筛选"
+  },
+  "table": {
+    "agent": "Agent",
+    "status": "状态",
+    "description": "描述",
+    "updated": "更新时间",
+    "manage": "管理",
+    "view": "查看",
+    "empty": "没有符合当前筛选条件的 Agent",
+    "total": "{total, plural, other {# 个 Agent}}"
+  },
+  "status": {
+    "active": "启用",
+    "disabled": "停用",
+    "yes": "是",
+    "no": "否"
+  },
+  "drawer": {
+    "createTitle": "创建受治理 Agent",
+    "loadingTitle": "Agent 加载中",
+    "resolving": "正在解析治理边界……"
+  },
+  "create": {
+    "heading": "Agent 身份",
+    "headingDetail": "请先创建受治理主体。能力、运行时与调用授权将在创建完成后配置。",
+    "cancel": "取消",
+    "submit": "创建 Agent"
+  },
+  "form": {
+    "slug": "唯一 Slug",
+    "slugRequired": "请输入 Agent Slug",
+    "slugPattern": "仅能使用小写字母、数字和连字符",
+    "slugPlaceholder": "directory-agent",
+    "name": "显示名称",
+    "namePlaceholder": "目录 Agent",
+    "description": "职责说明",
+    "descriptionPlaceholder": "描述该 Agent 的职责边界。切勿包含任何密钥。",
+    "lifecycleStatus": "生命周期状态"
+  },
+  "tabs": {
+    "profile": "Profile",
+    "capabilities": "能力",
+    "runtime": "运行时",
+    "access": "谁可调用"
+  },
+  "profile": {
+    "heading": "Profile",
+    "headingDetail": "身份元数据与生命周期状态独立保存，不会影响能力、运行时或授权。",
+    "subjectId": "主体 ID",
+    "systemResource": "系统资源",
+    "created": "创建时间",
+    "save": "保存 Profile"
+  },
+  "capabilities": {
+    "heading": "能力",
+    "headingDetail": "仅当操作者与该 Agent 当前同时持有某项能力所需的权限时，运行时才会暴露该能力。",
+    "boundaryTitle": "主体 ∩ Agent",
+    "boundaryDetail": "继承角色与直接权限是相互独立的授权边界，各自独立保存。",
+    "inheritedRoles": "继承角色",
+    "inheritedRolesPlaceholder": "选择该 Agent 继承的角色",
+    "saveInheritedRoles": "保存继承角色",
+    "directPermissions": "直接权限",
+    "directPermissionsPlaceholder": "选择最小化的直接权限",
+    "saveDirectPermissions": "保存直接权限",
+    "surfaceUnavailableTitle": "最新能力面不可用",
+    "surfaceUnavailableDetail": "授权变更已保存，但此抽屉不会把之前的有效权限当作当前权限展示。请关闭后重新打开以重试。",
+    "effectiveSurface": "有效能力面",
+    "effectiveCount": "{count, plural, other {# 项有效权限}}",
+    "noCapabilities": "当前没有暴露任何能力。"
+  },
+  "runtime": {
+    "heading": "运行时",
+    "headingDetail": "一次运行在被放入 BullMQ 运行时队列之前，会捕获这些设置的不可变快照。",
+    "notConfiguredTitle": "运行时配置尚不可用",
+    "notConfiguredDetail": "在配置模型 Profile 与系统提示词之前，该 Agent 无法被调用。",
+    "modelProfile": "模型 Profile",
+    "modelProfileRequired": "请选择一个启用的模型 Profile",
+    "modelProfilePlaceholder": "选择受治理的 Profile",
+    "modelDisabledSuffix": "（已停用）",
+    "systemPrompt": "系统提示词",
+    "systemPromptPlaceholder": "定义职责、安全与响应边界。",
+    "maxOutputTokens": "最大输出 Token",
+    "envNote": "Provider 连接、API Key 与 Base URL 属于 worker 环境设置，绝不会返回到此页面。",
+    "save": "保存运行时"
+  },
+  "access": {
+    "heading": "谁可调用",
+    "headingDetail": "用户、角色与部门授权是正向 OR 规则。每个调用者还必须持有 agents:invoke；任何角色都不能绕过显式授权。",
+    "noGrantsTitle": "无授权即无访问",
+    "noGrantsDetail": "即使是超级管理员，也需要针对该 Agent 的显式用户、角色或部门授权。",
+    "userDirRequiredTitle": "需要用户目录权限才能修改具名用户授权",
+    "userDirRequiredDetail": "已有的具名用户授权将保持关联，并在保存角色或部门授权时被保留。",
+    "roleDirRequiredTitle": "需要角色目录权限才能修改角色授权",
+    "roleDirRequiredDetail": "已有的角色授权将保持关联，并在保存其他调用授权时被保留。",
+    "departmentDirRequiredTitle": "需要部门目录权限才能修改部门授权",
+    "departmentDirRequiredDetail": "已有的部门授权及后代范围将保持关联，并在保存其他调用授权时被保留。",
+    "userSearchUnavailable": "用户目录搜索暂时不可用。已有授权将被保留。",
+    "users": "用户",
+    "userCandidatesAria": "用户授权候选",
+    "userSearchPlaceholder": "搜索用户目录",
+    "userDirectoryRequiredPlaceholder": "需要用户目录访问权限",
+    "roles": "角色",
+    "roleCandidatesAria": "角色授权候选",
+    "rolePlaceholder": "授予角色持有者",
+    "departments": "部门",
+    "addDepartment": "添加部门",
+    "departmentRequired": "请选择部门",
+    "departmentAria": "部门授权",
+    "departmentPlaceholder": "部门",
+    "includeDescendants": "包含下级部门",
+    "removeDepartmentAria": "移除部门授权",
+    "save": "保存调用授权"
+  },
+  "errors": {
+    "permissionChanged": "在你的权限发生变化后，此 Agent 未能完成加载。请刷新页面以更新可用的治理区块。",
+    "notFound": "该 Agent 已不存在或不再可用。",
+    "loadFailed": "无法加载完整的 Agent 治理记录。请刷新页面后重试。",
+    "createFailed": "无法创建该 Agent。",
+    "profileFailed": "无法保存该 Agent 的 Profile。",
+    "rolesFailed": "无法保存继承角色。",
+    "rolesSurfaceFailed": "继承角色已保存，但无法加载最新能力面。",
+    "permissionsFailed": "无法保存直接权限。",
+    "permissionsSurfaceFailed": "直接权限已保存，但无法加载最新能力面。",
+    "runtimeFailed": "无法保存该 Agent 的运行时。",
+    "accessFailed": "无法保存该 Agent 的调用授权。"
+  },
+  "notices": {
+    "profileSaved": "Profile 边界已独立保存。",
+    "rolesSaved": "继承角色已保存。直接权限未发生变更。",
+    "permissionsSaved": "直接权限已保存。角色分配未发生变更。",
+    "runtimeSaved": "运行时快照设置已独立保存。",
+    "accessSaved": "调用授权已保存。每个操作者仍需持有调用权限。"
+  },
+  "actions": {
+    "forbidden": "你的账号无权更新 {resource}。",
+    "invalidRequest": "请求无效：{message}",
+    "serviceUnavailable": "{resource} 服务暂时不可用。",
+    "resources": {
+      "agentProfile": "Agent Profile",
+      "agentRoles": "Agent 角色分配",
+      "agentPermissions": "Agent 直接权限",
+      "agentRuntime": "Agent 运行时",
+      "agentAccess": "Agent 调用授权"
+    }
+  }
+}

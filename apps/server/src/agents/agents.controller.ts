@@ -8,6 +8,8 @@ import { CreateAgentDto } from "./dto/create-agent.dto";
 import { ListAgentsDto } from "./dto/list-agents.dto";
 import { ReplaceAgentPermissionsDto } from "./dto/replace-agent-permissions.dto";
 import { ReplaceAgentRolesDto } from "./dto/replace-agent-roles.dto";
+import { UpdateAgentAccessDto } from "./dto/update-agent-access.dto";
+import { UpdateAgentRuntimeDto } from "./dto/update-agent-runtime.dto";
 import { UpdateAgentDto } from "./dto/update-agent.dto";
 
 @Controller("agents")
@@ -48,7 +50,7 @@ export class AgentsController {
     });
   }
 
-  @RequirePermissions("agents:update", "agents:assign-roles", "agents:assign-permissions")
+  @RequirePermissions("agents:update")
   @Put(":id")
   update(
     @Param("id", new ParseUUIDPipe()) agentId: string,
@@ -56,6 +58,44 @@ export class AgentsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.agents.update(agentId, dto, {
+      actorSubjectId: request.auth.subjectId,
+      ...getRequestMetadata(request),
+    });
+  }
+
+  @RequirePermissions("agents:configure-runtime")
+  @Get(":id/runtime")
+  getRuntime(@Param("id", new ParseUUIDPipe()) agentId: string) {
+    return this.agents.getRuntime(agentId);
+  }
+
+  @RequirePermissions("agents:configure-runtime")
+  @Put(":id/runtime")
+  updateRuntime(
+    @Param("id", new ParseUUIDPipe()) agentId: string,
+    @Body() dto: UpdateAgentRuntimeDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.agents.updateRuntime(agentId, dto, {
+      actorSubjectId: request.auth.subjectId,
+      ...getRequestMetadata(request),
+    });
+  }
+
+  @RequirePermissions("agents:assign-access")
+  @Get(":id/access")
+  getAccess(@Param("id", new ParseUUIDPipe()) agentId: string) {
+    return this.agents.getAccess(agentId);
+  }
+
+  @RequirePermissions("agents:assign-access")
+  @Put(":id/access")
+  updateAccess(
+    @Param("id", new ParseUUIDPipe()) agentId: string,
+    @Body() dto: UpdateAgentAccessDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.agents.updateAccess(agentId, dto, {
       actorSubjectId: request.auth.subjectId,
       ...getRequestMetadata(request),
     });

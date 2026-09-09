@@ -1,0 +1,63 @@
+{
+  "page": {
+    "eyebrow": "Runtime governance / Model profiles",
+    "title": "Model Registry",
+    "description": "Profiles select model IDs for the single environment-backed connection. Credentials, headers and provider URLs never enter this control-plane form.",
+    "newProfile": "New Profile"
+  },
+  "stats": {
+    "profiles": "Profiles",
+    "enabled": "Enabled",
+    "secretsWorkerOnly": "Secrets remain Worker-only"
+  },
+  "table": {
+    "profile": "Profile",
+    "modelId": "Model ID",
+    "connection": "Connection",
+    "connectionTooltip": "Provider URL and credentials are controlled by the Worker environment.",
+    "lastCheck": "Last check",
+    "neverChecked": "Never checked",
+    "status": "Status",
+    "check": "Check",
+    "edit": "Edit",
+    "view": "View"
+  },
+  "drawer": {
+    "createTitle": "Create Model Profile",
+    "editTitle": "Model Profile / {key}",
+    "connectionFixedTitle": "Connection is fixed to openai-compatible / default",
+    "connectionFixedDescription": "API keys, base URLs, environment variable names and custom headers cannot be viewed or changed here."
+  },
+  "form": {
+    "keyLabel": "Profile key",
+    "keyRequired": "Enter a stable profile key",
+    "keyPattern": "Use lowercase letters, numbers and hyphens",
+    "keyLength": "Use between 3 and 64 characters",
+    "keyPlaceholder": "default",
+    "nameLabel": "Display name",
+    "namePlaceholder": "Default reasoning model",
+    "modelIdLabel": "Provider model ID",
+    "modelIdPlaceholder": "provider-model-id",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Explain the governed purpose of this profile.",
+    "statusLabel": "Status",
+    "statusActive": "Active",
+    "statusDisabled": "Disabled"
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "saveProfile": "Save Profile",
+    "createProfile": "Create Profile"
+  },
+  "actions": {
+    "forbidden": "Your account cannot change model governance.",
+    "conflict": "This model profile key is already in use.",
+    "invalid": "Invalid model profile: {message}",
+    "serviceUnavailable": "The model control service is temporarily unavailable."
+  },
+  "errors": {
+    "saveFailed": "Unable to save the model profile.",
+    "checkQueueFailed": "Unable to queue the model check.",
+    "checkStatusUnavailable": "The check was queued, but its latest status could not be loaded."
+  }
+}

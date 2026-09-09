@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AppController } from "./app.controller";
@@ -16,6 +16,11 @@ import { RolesModule } from "./roles/roles.module";
 import { CapabilitiesModule } from "./capabilities/capabilities.module";
 import { AgentsModule } from "./agents/agents.module";
 import { PermissionsModule } from "./permissions/permissions.module";
+import { RuntimeModule } from "./runtime/runtime.module";
+import { ModelsModule } from "./models/models.module";
+import { DepartmentsModule } from "./departments/departments.module";
+import { ConversationsModule } from "./conversations/conversations.module";
+import { SafeExceptionFilter } from "./safe-exception.filter";
 
 @Module({
   imports: [
@@ -26,6 +31,7 @@ import { PermissionsModule } from "./permissions/permissions.module";
     }),
     ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 100 }]),
     DatabaseModule,
+    RuntimeModule,
     AuditModule,
     RbacModule,
     AuthModule,
@@ -34,9 +40,13 @@ import { PermissionsModule } from "./permissions/permissions.module";
     PermissionsModule,
     UsersModule,
     RolesModule,
+    ModelsModule,
+    DepartmentsModule,
+    ConversationsModule,
   ],
   controllers: [AppController],
   providers: [
+    { provide: APP_FILTER, useClass: SafeExceptionFilter },
     { provide: APP_GUARD, useClass: OriginGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SessionAuthGuard },

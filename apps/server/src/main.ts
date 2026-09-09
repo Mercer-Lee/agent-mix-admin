@@ -9,6 +9,10 @@ import type { Environment } from "./config/environment";
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService<Environment, true>);
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .set("trust proxy", config.get("TRUST_PROXY", { infer: true }));
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),

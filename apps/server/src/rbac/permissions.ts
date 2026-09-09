@@ -12,5 +12,32 @@ export const CORE_PERMISSIONS = [
     action: "assign-permissions",
     description: "Replace direct agent permission assignments",
   },
+  {
+    resource: "agents",
+    action: "configure-runtime",
+    description: "Configure an agent runtime and model profile",
+  },
+  {
+    resource: "agents",
+    action: "assign-access",
+    description: "Configure who may invoke an agent",
+  },
+  { resource: "agents", action: "invoke", description: "Invoke an authorized agent" },
+  { resource: "models", action: "read", description: "View model profiles" },
+  { resource: "models", action: "create", description: "Create model profiles" },
+  { resource: "models", action: "update", description: "Update model profiles" },
+  { resource: "models", action: "test", description: "Run model connection checks" },
+  { resource: "departments", action: "read", description: "View departments" },
+  { resource: "audit-logs", action: "read", description: "View system audit events" },
+  {
+    resource: "conversations",
+    action: "audit",
+    description: "View conversation audit metadata",
+  },
+  {
+    resource: "conversations",
+    action: "read-content",
+    description: "View conversation message content for audit",
+  },
   { resource: "permissions", action: "read", description: "View permission catalog" },
 ] as const;

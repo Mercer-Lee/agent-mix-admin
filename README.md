@@ -22,35 +22,42 @@ Core pillars:
 
 ```bash
 corepack enable && pnpm install   # Node ≥22.13, pnpm ≥10
-cp .env.example .env             # set BOOTSTRAP_ADMIN_PASSWORD (12+ characters)
+cp .env.example .env             # set PostgreSQL variables + DATABASE_URL,
+                                  # BOOTSTRAP_ADMIN_PASSWORD, and model variables
 pnpm db:migrate && pnpm db:seed   # schema + bootstrap administrator
 pnpm dev                          # admin :3100 · server :3101 · agent-worker
 ```
 
-For local development, prefer reusing PostgreSQL and Redis already installed on the host, and configure `DATABASE_URL` and `REDIS_URL` in `.env` accordingly. If either service is unavailable locally, start the containerized dependencies with the repository's Compose configuration:
+For local development, prefer reusing PostgreSQL and Redis already installed on the host, and configure `DATABASE_URL` and `REDIS_URL` in `.env` accordingly. When using Compose, fill `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`, then make `DATABASE_URL` use those same values. If either service is unavailable locally, start the containerized dependencies with the repository's Compose configuration:
 
 ```bash
 docker compose up -d              # containerized Postgres + Redis
 ```
 
-Docker Desktop includes the `docker compose` subcommand, so the legacy standalone `docker-compose` installation is not required. See [.env.example](.env.example) for the environment variable template. Control-plane health check: `curl localhost:3101/api/health`.
+Docker Desktop includes the `docker compose` subcommand, so the legacy standalone `docker-compose` installation is not required. See [.env.example](.env.example) for the environment variable template. Control-plane health check: `curl localhost:3101/api/health`. When `pnpm dev` starts, the admin app waits for the control plane on `:3101` to become ready before booting, so the console is safe to open immediately after startup.
 
 ## Status
 
-🚧 Phase 1 is in progress. The first two control-plane milestones are complete:
+✅ Phase 1 is complete:
 
 - [x] **Phase 1A — Control-plane foundation:** Drizzle/PostgreSQL schema, database-backed sessions, unified user/role/agent RBAC, audit events, protected Admin authentication, and isolated integration tests.
 - [x] **Phase 1B — Governed Agent resources:** Capability Registry and executor, the `users.search` vertical slice, Agent CRUD and status management, role/direct-permission assignment, live capability discovery, and the Admin Agent management UI.
-- [ ] **Next — AI runtime entry point:** model configuration and the built-in chat Agent, while preserving the control-plane/execution-plane boundary.
+- [x] **Phase 1C — Governed runtime loop:** environment-backed model profiles, explicit user/role/department invocation grants, a protected system Agent, transactional outbox, BullMQ streaming Runtime, reconnectable SSE chat, cancellation, the authorized `users.search` bridge, usage, model checks, and content-separated conversation audit.
 
-MCP transport, asynchronous worker execution, approval flows, and versioned Agent releases remain later milestones.
+Post-Phase 1 console polish: the Admin console ships a collapsible sidebar layout (icon rail with hover flyouts, drawer on mobile) and Simplified Chinese / English internationalization via next-intl — the locale is remembered in a cookie and switchable from the top bar and the sign-in page.
+
+The Worker never reads PostgreSQL or calls Server HTTP, and the Server never calls the model. Credentials stay in Worker environment variables. General MCP transport, approval flows, and versioned Agent releases remain Phase 2 work.
 
 Roadmap:
 
-- [ ] Phase 1 "RuoYi with AI": control-plane foundation and governed Agent management are complete; model config + built-in chat Agent remain
+- [x] Phase 1 "RuoYi with AI": governed model-to-Agent-to-Runtime-to-tool-to-audit vertical loop
 - [ ] Phase 2 "Agents as resources": declarative agent definitions + MCP tool registry + versioned releases + HITL approvals
 - [ ] Phase 3 "Enterprise depth": cost allocation + evals + knowledge-base plugin + OIDC
 
 ## License
 
 Planned: Apache-2.0 for the core, commercial licensing for selected enterprise modules (open-core).
+
+## Verification
+
+`pnpm test:integration` starts isolated PostgreSQL 17 and Redis 7 Testcontainers and uses a local fake OpenAI-compatible SSE service. Override images with `TEST_POSTGRES_IMAGE` and `TEST_REDIS_IMAGE` when reusing a local registry or cached image.

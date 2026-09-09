@@ -4,11 +4,28 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Environment } from "../config/environment";
 import { CORE_PERMISSIONS } from "../rbac/permissions";
 import * as schema from "./schema";
-import { permissions, roles, subjectPermissions, subjectRoles, subjects, users } from "./schema";
+import {
+  agentRoleAccessGrants,
+  agentRuntimes,
+  agents,
+  modelProfiles,
+  permissions,
+  roles,
+  subjectPermissions,
+  subjectRoles,
+  subjects,
+  users,
+} from "./schema";
+
+const SYSTEM_AGENT_SLUG = "agentmix-assistant";
+const DEFAULT_MODEL_PROFILE_KEY = "default";
 
 export async function seedDatabase(
   db: NodePgDatabase<typeof schema>,
-  environment: Pick<Environment, "BOOTSTRAP_ADMIN_USERNAME" | "BOOTSTRAP_ADMIN_PASSWORD">,
+  environment: Pick<
+    Environment,
+    "BOOTSTRAP_ADMIN_USERNAME" | "BOOTSTRAP_ADMIN_PASSWORD"
+  > & { MODEL?: string },
 ): Promise<string> {
   const username = environment.BOOTSTRAP_ADMIN_USERNAME.trim().toLowerCase();
   const password = environment.BOOTSTRAP_ADMIN_PASSWORD;
@@ -18,6 +35,7 @@ export async function seedDatabase(
   if (!password || password.length < 12 || password.length > 128) {
     throw new Error("BOOTSTRAP_ADMIN_PASSWORD must contain between 12 and 128 characters");
   }
+  const modelId = environment.MODEL?.trim() || "gpt-4o-mini";
 
   await db.transaction(async (tx) => {
     await tx.insert(permissions).values([...CORE_PERMISSIONS]).onConflictDoNothing();
@@ -46,6 +64,75 @@ export async function seedDatabase(
     await tx
       .insert(subjectPermissions)
       .values(allPermissionRows.map((permission) => ({ subjectId: role[0]!.id, permissionId: permission.id })))
+      .onConflictDoNothing();
+
+    await tx
+      .insert(modelProfiles)
+      .values({
+        key: DEFAULT_MODEL_PROFILE_KEY,
+        name: "Default",
+        description: "Environment-backed default OpenAI-compatible model profile",
+        modelId,
+        isSystem: true,
+      })
+      .onConflictDoUpdate({
+        target: modelProfiles.key,
+        set: {
+          name: "Default",
+          description: "Environment-backed default OpenAI-compatible model profile",
+          modelId,
+          isSystem: true,
+          updatedAt: new Date(),
+        },
+      });
+    const defaultModel = await tx
+      .select({ id: modelProfiles.id })
+      .from(modelProfiles)
+      .where(eq(modelProfiles.key, DEFAULT_MODEL_PROFILE_KEY))
+      .limit(1);
+
+    let systemAgent = await tx
+      .select({ id: agents.subjectId })
+      .from(agents)
+      .where(eq(agents.slug, SYSTEM_AGENT_SLUG))
+      .limit(1);
+    if (!systemAgent[0]) {
+      const agentSubject = await tx
+        .insert(subjects)
+        .values({ type: "agent" })
+        .returning({ id: subjects.id });
+      await tx.insert(agents).values({
+        subjectId: agentSubject[0]!.id,
+        slug: SYSTEM_AGENT_SLUG,
+        name: "AgentMix Assistant",
+        description: "Governed built-in assistant for the AgentMix workspace",
+        isSystem: true,
+      });
+      systemAgent = [{ id: agentSubject[0]!.id }];
+    } else {
+      await tx.update(agents).set({ isSystem: true }).where(eq(agents.subjectId, systemAgent[0].id));
+    }
+
+    await tx
+      .insert(agentRuntimes)
+      .values({
+        agentSubjectId: systemAgent[0]!.id,
+        modelProfileId: defaultModel[0]!.id,
+        systemPrompt:
+          "You are AgentMix Assistant. Help users operate internal systems safely, accurately, and within granted capabilities.",
+      })
+      .onConflictDoNothing();
+    const usersReadPermission = allPermissionRows.find(
+      (permission) => permission.resource === "users" && permission.action === "read",
+    );
+    if (!usersReadPermission) throw new Error("Core permission users:read was not seeded");
+    await tx
+      .insert(subjectPermissions)
+      .values({ subjectId: systemAgent[0]!.id, permissionId: usersReadPermission.id })
+      .onConflictDoNothing();
+    await tx
+      .insert(agentRoleAccessGrants)
+      .values({ agentSubjectId: systemAgent[0]!.id, roleSubjectId: role[0]!.id })
       .onConflictDoNothing();
 
     let admin = await tx

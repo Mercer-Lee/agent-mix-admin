@@ -7,9 +7,36 @@
 
 :root {
   color-scheme: dark;
+  --agentmix-accent: #b8f500;
+  --agentmix-surface: #111415;
+  --agentmix-grid: rgb(255 255 255 / 0.035);
 }
 
 body {
   margin: 0;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  background: #0a0c0d;
+  font-family: "Avenir Next", "IBM Plex Sans", sans-serif;
+}
+
+::selection {
+  background: rgb(184 245 0 / 0.25);
+  color: #f4f4f5;
+}
+
+.agentmix-grid {
+  background-image:
+    linear-gradient(var(--agentmix-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--agentmix-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .agentmix-signal {
+    animation: agentmix-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes agentmix-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
