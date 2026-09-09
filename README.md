@@ -34,7 +34,7 @@ For local development, prefer reusing PostgreSQL and Redis already installed on 
 docker compose up -d              # containerized Postgres + Redis
 ```
 
-Docker Desktop includes the `docker compose` subcommand, so the legacy standalone `docker-compose` installation is not required. See [.env.example](.env.example) for the environment variable template. Control-plane health check: `curl localhost:3101/api/health`.
+Docker Desktop includes the `docker compose` subcommand, so the legacy standalone `docker-compose` installation is not required. See [.env.example](.env.example) for the environment variable template. Control-plane health check: `curl localhost:3101/api/health`. When `pnpm dev` starts, the admin app waits for the control plane on `:3101` to become ready before booting, so the console is safe to open immediately after startup.
 
 ## Status
 
@@ -43,6 +43,8 @@ Docker Desktop includes the `docker compose` subcommand, so the legacy standalon
 - [x] **Phase 1A — Control-plane foundation:** Drizzle/PostgreSQL schema, database-backed sessions, unified user/role/agent RBAC, audit events, protected Admin authentication, and isolated integration tests.
 - [x] **Phase 1B — Governed Agent resources:** Capability Registry and executor, the `users.search` vertical slice, Agent CRUD and status management, role/direct-permission assignment, live capability discovery, and the Admin Agent management UI.
 - [x] **Phase 1C — Governed runtime loop:** environment-backed model profiles, explicit user/role/department invocation grants, a protected system Agent, transactional outbox, BullMQ streaming Runtime, reconnectable SSE chat, cancellation, the authorized `users.search` bridge, usage, model checks, and content-separated conversation audit.
+
+Post-Phase 1 console polish: the Admin console ships a collapsible sidebar layout (icon rail with hover flyouts, drawer on mobile) and Simplified Chinese / English internationalization via next-intl — the locale is remembered in a cookie and switchable from the top bar and the sign-in page.
 
 The Worker never reads PostgreSQL or calls Server HTTP, and the Server never calls the model. Credentials stay in Worker environment variables. General MCP transport, approval flows, and versioned Agent releases remain Phase 2 work.
 

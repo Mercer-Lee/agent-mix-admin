@@ -34,7 +34,7 @@ pnpm dev                          # admin :3100 · server :3101 · agent-worker
 docker compose up -d              # 启动容器化的 Postgres + Redis
 ```
 
-Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `docker-compose`。环境变量模板见 [.env.example](.env.example)。控制面 API 健康检查：`curl localhost:3101/api/health`。
+Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `docker-compose`。环境变量模板见 [.env.example](.env.example)。控制面 API 健康检查：`curl localhost:3101/api/health`。`pnpm dev` 启动时，admin 会先等待控制面（`:3101`）就绪再拉起，因此启动完成后立即可安全访问控制台。
 
 ## 状态
 
@@ -43,6 +43,8 @@ Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `
 - [x] **Phase 1A — 控制面基础：** Drizzle/PostgreSQL 数据模型、数据库 Session、user/role/agent 统一 RBAC、审计事件、受保护的 Admin 登录闭环和隔离数据库集成测试。
 - [x] **Phase 1B — 受治理的 Agent 资源：** Capability Registry 与统一执行器、`users.search` 纵向样板、Agent CRUD 与状态管理、角色/直接权限分配、实时 Capability 发现和 Admin Agent 管理界面。
 - [x] **Phase 1C — 受治理 Runtime 闭环：** 环境托管模型配置、user/role/department 显式调用授权、受保护的系统 Agent、事务 outbox、BullMQ 流式 Runtime、可续传 SSE 对话、停止生成、受双重授权的 `users.search` 桥、用量、模型检查和正文分权会话审计。
+
+Phase 1 之后的控制台打磨：Admin 控制台已具备可折叠侧边栏布局（图标栏 + 悬停浮层，移动端抽屉）与中英双语（基于 next-intl，语言记忆在 Cookie，顶栏与登录页均可切换）。
 
 Worker 不读 PostgreSQL、不调用 Server HTTP，Server 不直接调用模型；凭证只存在于 Worker 环境。通用 MCP 传输、审批流和 Agent 版本发布仍属于 Phase 2。
 
