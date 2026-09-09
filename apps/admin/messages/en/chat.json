@@ -1,0 +1,53 @@
+{
+  "sidebar": {
+    "newConversation": "New conversation",
+    "untitledConversation": "Untitled conversation",
+    "noConversations": "No conversations yet",
+    "conversations": "Conversations",
+    "openConversations": "Open conversations"
+  },
+  "header": {
+    "noRuntimeSelected": "No runtime selected",
+    "removeConversation": "Remove conversation",
+    "removeTitle": "Remove this conversation?",
+    "removeDescription": "It will be hidden from your history but retained for authorized audit.",
+    "remove": "Remove",
+    "cancel": "Cancel"
+  },
+  "messages": {
+    "agent": "Agent",
+    "you": "You",
+    "streaming": "Streaming",
+    "toolActivity": "Tool activity"
+  },
+  "empty": {
+    "noAgents": "No governed Agent is currently available to you",
+    "workbench": "Runtime workbench",
+    "startRun": "Start a governed run",
+    "startRunDescription": "Every message creates an immutable execution snapshot, streams through BullMQ and records metadata for audit."
+  },
+  "composer": {
+    "selectAgentAria": "Select Agent",
+    "selectAgentPlaceholder": "Select an Agent",
+    "waitActiveRun": "Wait for the active run or stop it…",
+    "messagePlaceholder": "Message the governed Agent…",
+    "stop": "Stop",
+    "send": "Send",
+    "hint": "Enter sends your message, Shift+Enter adds a new line, and the output is rendered as sanitized Markdown."
+  },
+  "errors": {
+    "dismiss": "Dismiss error",
+    "sendFailed": "Unable to send the message.",
+    "stopFailed": "Unable to stop the run.",
+    "removeFailed": "Unable to remove the conversation.",
+    "generationFailed": "Generation failed.",
+    "generationFailedWithCode": "Generation failed ({code}).",
+    "runFailed": "The runtime stopped before completing this run. Error code: {code}"
+  },
+  "actions": {
+    "forbidden": "You cannot invoke this Agent.",
+    "unavailable": "This conversation or Agent is unavailable.",
+    "invalidMessage": "Invalid message: {message}",
+    "serviceUnavailable": "The conversation service is temporarily unavailable."
+  }
+}

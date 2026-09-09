@@ -1,0 +1,68 @@
+{
+  "page": {
+    "eyebrow": "Evidence plane / Audit",
+    "title": "Audit Console",
+    "intro": "System events remain content-free. Conversation metadata and message bodies are separated by explicit permissions."
+  },
+  "tabs": {
+    "events": "System events",
+    "conversations": "Conversation audit"
+  },
+  "events": {
+    "total": "{total, plural, =1 {1 immutable audit event} other {# immutable audit events}}",
+    "paginationTotal": "{total, plural, =1 {1 event} other {# events}}",
+    "empty": "No audit events",
+    "system": "System",
+    "columns": {
+      "time": "Time",
+      "action": "Action",
+      "actor": "Actor",
+      "resource": "Resource",
+      "outcome": "Outcome",
+      "metadata": "Metadata"
+    }
+  },
+  "conversations": {
+    "total": "{total, plural, =1 {1 retained conversation record} other {# retained conversation records}}",
+    "paginationTotal": "{total, plural, =1 {1 conversation} other {# conversations}}",
+    "empty": "No conversation audits",
+    "recordName": "Conversation record",
+    "usageTokens": "{total} tokens",
+    "contentPermission": "Content permission: {value}",
+    "contentGranted": "granted",
+    "contentMetadataOnly": "metadata only",
+    "columns": {
+      "conversation": "Conversation",
+      "actor": "Actor",
+      "agentModel": "Agent / Model",
+      "status": "Status",
+      "usage": "Usage",
+      "updated": "Updated",
+      "inspect": "Inspect"
+    }
+  },
+  "drawer": {
+    "title": "Conversation Audit Record",
+    "loading": "Loading retained audit metadata…",
+    "contentHeading": "Conversation content",
+    "emptyContent": "No retained message content",
+    "fields": {
+      "conversationId": "Conversation ID",
+      "actor": "Actor",
+      "agent": "Agent",
+      "model": "Model",
+      "status": "Status",
+      "usage": "Usage",
+      "created": "Created",
+      "deleted": "Deleted",
+      "deletedNo": "No"
+    },
+    "protected": {
+      "title": "Message bodies are protected",
+      "description": "conversations:read-content is required. This page did not request the content endpoint."
+    }
+  },
+  "errors": {
+    "loadConversation": "Unable to load the selected conversation audit record."
+  }
+}

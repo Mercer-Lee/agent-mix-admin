@@ -1,0 +1,63 @@
+{
+  "page": {
+    "eyebrow": "运行时治理 / 模型 Profile",
+    "title": "模型注册表",
+    "description": "Profile 用于为唯一的环境托管连接选择模型 ID。凭证、请求头与 Provider URL 永远不会进入此控制面表单。",
+    "newProfile": "新建 Profile"
+  },
+  "stats": {
+    "profiles": "Profile 数量",
+    "enabled": "已启用",
+    "secretsWorkerOnly": "密钥仅保留在 Worker 侧"
+  },
+  "table": {
+    "profile": "Profile",
+    "modelId": "模型 ID",
+    "connection": "连接",
+    "connectionTooltip": "Provider URL 与凭证由 Worker 环境统一管控。",
+    "lastCheck": "上次检查",
+    "neverChecked": "从未检查",
+    "status": "状态",
+    "check": "检查",
+    "edit": "编辑",
+    "view": "查看"
+  },
+  "drawer": {
+    "createTitle": "新建模型 Profile",
+    "editTitle": "模型 Profile / {key}",
+    "connectionFixedTitle": "连接固定为 openai-compatible / default",
+    "connectionFixedDescription": "API Key、Base URL、环境变量名称与自定义请求头在此均不可查看或修改。"
+  },
+  "form": {
+    "keyLabel": "Profile Key",
+    "keyRequired": "请输入稳定的 Profile Key",
+    "keyPattern": "只能使用小写字母、数字和连字符",
+    "keyLength": "长度需在 3 到 64 个字符之间",
+    "keyPlaceholder": "default",
+    "nameLabel": "显示名称",
+    "namePlaceholder": "默认推理模型",
+    "modelIdLabel": "Provider 模型 ID",
+    "modelIdPlaceholder": "provider-model-id",
+    "descriptionLabel": "描述",
+    "descriptionPlaceholder": "请说明该 Profile 的治理用途。",
+    "statusLabel": "状态",
+    "statusActive": "启用",
+    "statusDisabled": "停用"
+  },
+  "buttons": {
+    "cancel": "取消",
+    "saveProfile": "保存 Profile",
+    "createProfile": "创建 Profile"
+  },
+  "actions": {
+    "forbidden": "当前账号无权变更模型治理配置。",
+    "conflict": "该 Profile Key 已被占用。",
+    "invalid": "模型 Profile 无效：{message}",
+    "serviceUnavailable": "模型管控服务暂时不可用。"
+  },
+  "errors": {
+    "saveFailed": "无法保存模型 Profile。",
+    "checkQueueFailed": "无法发起模型检查。",
+    "checkStatusUnavailable": "检查已加入队列，但无法加载其最新状态。"
+  }
+}

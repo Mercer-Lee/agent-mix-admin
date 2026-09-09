@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { ServerApiError, serverApi } from "../../_lib/server-api";
 import type {
   AgentDetail,
@@ -17,13 +18,18 @@ export interface AgentActionResult<T = AgentDetail> {
   error?: string;
 }
 
-function actionError(error: unknown, resource: string): AgentActionResult<never> {
+type AgentActionResource = "agentProfile" | "agentRoles" | "agentPermissions" | "agentRuntime" | "agentAccess";
+
+async function actionError(error: unknown, resource: AgentActionResource): Promise<AgentActionResult<never>> {
+  const t = await getTranslations("agents.actions");
   if (error instanceof ServerApiError) {
-    if (error.status === 403) return { ok: false, error: `Your account cannot update ${resource}.` };
+    if (error.status === 403) {
+      return { ok: false, error: t("forbidden", { resource: t(`resources.${resource}`) }) };
+    }
     if (error.status === 409) return { ok: false, error: error.message };
-    if (error.status === 400) return { ok: false, error: `Invalid request: ${error.message}` };
+    if (error.status === 400) return { ok: false, error: t("invalidRequest", { message: error.message }) };
   }
-  return { ok: false, error: `The ${resource} service is temporarily unavailable.` };
+  return { ok: false, error: t("serviceUnavailable", { resource: t(`resources.${resource}`) }) };
 }
 
 export async function createAgentAction(
@@ -41,7 +47,7 @@ export async function createAgentAction(
     revalidatePath("/agents");
     return { ok: true, data: agent };
   } catch (error) {
-    return actionError(error, "agent profile");
+    return await actionError(error, "agentProfile");
   }
 }
 
@@ -61,7 +67,7 @@ export async function updateAgentProfileAction(
     revalidatePath("/agents");
     return { ok: true, data: agent };
   } catch (error) {
-    return actionError(error, "agent profile");
+    return await actionError(error, "agentProfile");
   }
 }
 
@@ -77,7 +83,7 @@ export async function updateAgentRolesAction(
     revalidatePath("/agents");
     return { ok: true };
   } catch (error) {
-    return actionError(error, "agent role assignments");
+    return await actionError(error, "agentRoles");
   }
 }
 
@@ -93,7 +99,7 @@ export async function updateAgentPermissionsAction(
     revalidatePath("/agents");
     return { ok: true };
   } catch (error) {
-    return actionError(error, "agent direct permissions");
+    return await actionError(error, "agentPermissions");
   }
 }
 
@@ -109,7 +115,7 @@ export async function updateAgentRuntimeAction(
     revalidatePath("/agents");
     return { ok: true, data: runtime };
   } catch (error) {
-    return actionError(error, "agent runtime");
+    return await actionError(error, "agentRuntime");
   }
 }
 
@@ -126,6 +132,6 @@ export async function updateAgentAccessAction(
     revalidatePath("/chat");
     return { ok: true, data: access };
   } catch (error) {
-    return actionError(error, "agent invocation access");
+    return await actionError(error, "agentAccess");
   }
 }

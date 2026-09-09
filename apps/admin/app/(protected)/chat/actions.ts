@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { ServerApiError, serverApi } from "../../_lib/server-api";
 import type { CreateConversationResponse, CreateRunResponse } from "./types";
 
@@ -10,14 +11,15 @@ interface ChatActionResult<T = undefined> {
   error?: string;
 }
 
-function actionError(error: unknown): ChatActionResult<never> {
+async function actionError(error: unknown): Promise<ChatActionResult<never>> {
+  const t = await getTranslations("chat.actions");
   if (error instanceof ServerApiError) {
-    if (error.status === 403) return { ok: false, error: "You cannot invoke this Agent." };
-    if (error.status === 404) return { ok: false, error: "This conversation or Agent is unavailable." };
+    if (error.status === 403) return { ok: false, error: t("forbidden") };
+    if (error.status === 404) return { ok: false, error: t("unavailable") };
     if (error.status === 409) return { ok: false, error: error.message };
-    if (error.status === 400) return { ok: false, error: `Invalid message: ${error.message}` };
+    if (error.status === 400) return { ok: false, error: t("invalidMessage", { message: error.message }) };
   }
-  return { ok: false, error: "The conversation service is temporarily unavailable." };
+  return { ok: false, error: t("serviceUnavailable") };
 }
 
 export async function createConversationAction(input: {
@@ -34,7 +36,7 @@ export async function createConversationAction(input: {
     revalidatePath("/chat");
     return { ok: true, data: response };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }
 
@@ -52,7 +54,7 @@ export async function sendConversationMessageAction(input: {
     revalidatePath(`/chat/${input.conversationId}`);
     return { ok: true, data: response };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }
 
@@ -61,7 +63,7 @@ export async function cancelRunAction(runId: string): Promise<ChatActionResult> 
     await serverApi<void>(`/runs/${runId}/cancel`, { method: "POST" });
     return { ok: true };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }
 
@@ -72,6 +74,6 @@ export async function deleteConversationAction(conversationId: string): Promise<
     revalidatePath(`/chat/${conversationId}`);
     return { ok: true };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }

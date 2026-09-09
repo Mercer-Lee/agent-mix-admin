@@ -9,6 +9,7 @@ import {
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import { Alert, Button, Drawer, Form, Input, Select, Table, Tag, Tooltip, type TableProps } from "antd";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { checkModelAction, createModelAction, updateModelAction } from "./actions";
@@ -39,7 +40,8 @@ const CHECK_TAG: Record<ModelCheckStatus, { color: string; label: string }> = {
 };
 
 function CheckState({ check }: { check: ModelCheckSummary | null }) {
-  if (!check) return <span className="font-mono text-xs text-zinc-600">Never checked</span>;
+  const t = useTranslations("models");
+  if (!check) return <span className="font-mono text-xs text-zinc-600">{t("table.neverChecked")}</span>;
   const meta = CHECK_TAG[check.status];
   return (
     <div>
@@ -69,6 +71,7 @@ async function waitForCheck(check: ModelCheckSummary): Promise<ModelCheckSummary
 }
 
 export function ModelsManager({ initialData, access }: ModelsManagerProps) {
+  const t = useTranslations("models");
   const router = useRouter();
   const [form] = Form.useForm<ModelFormValues>();
   const [models, setModels] = useState(initialData.items);
@@ -108,7 +111,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
       : await createModelAction(values);
     setSaving(false);
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to save the model profile.");
+      setError(result.error ?? t("errors.saveFailed"));
       return;
     }
     setModels((current) => {
@@ -128,7 +131,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
     setError(null);
     const result = await checkModelAction(model.id);
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to queue the model check.");
+      setError(result.error ?? t("errors.checkQueueFailed"));
       setCheckingId(null);
       return;
     }
@@ -141,7 +144,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
         current.map((item) => (item.id === model.id ? { ...item, lastCheck: finalCheck } : item)),
       );
     } catch {
-      setError("The check was queued, but its latest status could not be loaded.");
+      setError(t("errors.checkStatusUnavailable"));
     } finally {
       setCheckingId(null);
       router.refresh();
@@ -150,7 +153,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
 
   const columns: TableProps<ModelProfile>["columns"] = [
     {
-      title: "Profile",
+      title: t("table.profile"),
       key: "profile",
       render: (_, model) => (
         <div className="min-w-44">
@@ -166,16 +169,16 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
       ),
     },
     {
-      title: "Model ID",
+      title: t("table.modelId"),
       dataIndex: "modelId",
       render: (value: string) => <span className="font-mono text-xs text-zinc-300">{value}</span>,
     },
     {
-      title: "Connection",
+      title: t("table.connection"),
       key: "connection",
       width: 190,
       render: (_, model) => (
-        <Tooltip title="Provider URL and credentials are controlled by the Worker environment.">
+        <Tooltip title={t("table.connectionTooltip")}>
           <span className="font-mono text-xs text-zinc-500">
             {model.provider} / {model.connection}
           </span>
@@ -183,13 +186,13 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
       ),
     },
     {
-      title: "Last check",
+      title: t("table.lastCheck"),
       dataIndex: "lastCheck",
       width: 160,
       render: (value: ModelCheckSummary | null) => <CheckState check={value} />,
     },
     {
-      title: "Status",
+      title: t("table.status"),
       dataIndex: "status",
       width: 100,
       render: (status: ModelProfile["status"]) =>
@@ -209,7 +212,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
               loading={checkingId === model.id}
               onClick={() => void runCheck(model)}
             >
-              Check
+              {t("table.check")}
             </Button>
           ) : null}
           <Button
@@ -218,7 +221,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
             icon={access.canUpdate ? <EditOutlined /> : <ApiOutlined />}
             onClick={() => openEdit(model)}
           >
-            {access.canUpdate ? "Edit" : "View"}
+            {access.canUpdate ? t("table.edit") : t("table.view")}
           </Button>
         </div>
       ),
@@ -226,22 +229,21 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
   ];
 
   return (
-    <main className="agentmix-grid min-h-[calc(100vh-74px)]">
+    <main className="agentmix-grid min-h-[calc(100dvh-3.5rem)]">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <section className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
             <p className="m-0 font-mono text-xs tracking-[0.26em] text-[#b8f500] uppercase">
-              Runtime governance / Model profiles
+              {t("page.eyebrow")}
             </p>
-            <h1 className="mb-0 mt-3 text-4xl font-semibold tracking-[-0.045em]">Model Registry</h1>
+            <h1 className="mb-0 mt-3 text-4xl font-semibold tracking-[-0.045em]">{t("page.title")}</h1>
             <p className="mb-0 mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
-              Profiles select model IDs for the single environment-backed connection. Credentials, headers and
-              provider URLs never enter this control-plane form.
+              {t("page.description")}
             </p>
           </div>
           {access.canCreate ? (
             <Button data-testid="create-model" type="primary" size="large" icon={<PlusOutlined />} onClick={openCreate}>
-              New Profile
+              {t("page.newProfile")}
             </Button>
           ) : null}
         </section>
@@ -251,15 +253,15 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
         <section className="border border-white/10 bg-[#0d1011]/95">
           <div className="grid gap-4 border-b border-white/10 p-4 sm:grid-cols-3">
             <div>
-              <p className="m-0 font-mono text-[10px] tracking-[0.18em] text-zinc-600 uppercase">Profiles</p>
+              <p className="m-0 font-mono text-[10px] tracking-[0.18em] text-zinc-600 uppercase">{t("stats.profiles")}</p>
               <p className="mb-0 mt-1 text-xl text-zinc-100">{models.length}</p>
             </div>
             <div>
-              <p className="m-0 font-mono text-[10px] tracking-[0.18em] text-zinc-600 uppercase">Enabled</p>
+              <p className="m-0 font-mono text-[10px] tracking-[0.18em] text-zinc-600 uppercase">{t("stats.enabled")}</p>
               <p className="mb-0 mt-1 text-xl text-[#caff24]">{activeCount}</p>
             </div>
             <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <SafetyCertificateOutlined className="text-[#b8f500]" /> Secrets remain Worker-only
+              <SafetyCertificateOutlined className="text-[#b8f500]" /> {t("stats.secretsWorkerOnly")}
             </div>
           </div>
           <Table<ModelProfile>
@@ -276,7 +278,7 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
         destroyOnHidden
         size={560}
         open={drawerOpen}
-        title={selected ? `Model Profile / ${selected.key}` : "Create Model Profile"}
+        title={selected ? t("drawer.editTitle", { key: selected.key }) : t("drawer.createTitle")}
         onClose={() => setDrawerOpen(false)}
       >
         {error ? <Alert className="mb-5" type="error" showIcon title={error} /> : null}
@@ -284,8 +286,8 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
           className="mb-6"
           type="info"
           showIcon
-          title="Connection is fixed to openai-compatible / default"
-          description="API keys, base URLs, environment variable names and custom headers cannot be viewed or changed here."
+          title={t("drawer.connectionFixedTitle")}
+          description={t("drawer.connectionFixedDescription")}
         />
         <Form<ModelFormValues>
           form={form}
@@ -296,39 +298,39 @@ export function ModelsManager({ initialData, access }: ModelsManagerProps) {
         >
           <Form.Item
             name="key"
-            label="Profile key"
+            label={t("form.keyLabel")}
             rules={[
-              { required: true, message: "Enter a stable profile key" },
-              { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: "Use lowercase letters, numbers and hyphens" },
-              { min: 3, max: 64, message: "Use between 3 and 64 characters" },
+              { required: true, message: t("form.keyRequired") },
+              { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: t("form.keyPattern") },
+              { min: 3, max: 64, message: t("form.keyLength") },
             ]}
           >
-            <Input data-testid="model-key" disabled={Boolean(selected)} placeholder="default" />
+            <Input data-testid="model-key" disabled={Boolean(selected)} placeholder={t("form.keyPlaceholder")} />
           </Form.Item>
-          <Form.Item name="name" label="Display name" rules={[{ required: true }, { max: 120 }]}>
-            <Input data-testid="model-name" placeholder="Default reasoning model" />
+          <Form.Item name="name" label={t("form.nameLabel")} rules={[{ required: true }, { max: 120 }]}>
+            <Input data-testid="model-name" placeholder={t("form.namePlaceholder")} />
           </Form.Item>
-          <Form.Item name="modelId" label="Provider model ID" rules={[{ required: true }, { max: 200 }]}>
-            <Input data-testid="model-id" placeholder="provider-model-id" autoComplete="off" />
+          <Form.Item name="modelId" label={t("form.modelIdLabel")} rules={[{ required: true }, { max: 200 }]}>
+            <Input data-testid="model-id" placeholder={t("form.modelIdPlaceholder")} autoComplete="off" />
           </Form.Item>
-          <Form.Item name="description" label="Description" rules={[{ max: 1000 }]}>
-            <Input.TextArea rows={4} placeholder="Explain the governed purpose of this profile." />
+          <Form.Item name="description" label={t("form.descriptionLabel")} rules={[{ max: 1000 }]}>
+            <Input.TextArea rows={4} placeholder={t("form.descriptionPlaceholder")} />
           </Form.Item>
           {selected ? (
-            <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+            <Form.Item name="status" label={t("form.statusLabel")} rules={[{ required: true }]}>
               <Select
                 options={[
-                  { label: "Active", value: "active" },
-                  { label: "Disabled", value: "disabled" },
+                  { label: t("form.statusActive"), value: "active" },
+                  { label: t("form.statusDisabled"), value: "disabled" },
                 ]}
               />
             </Form.Item>
           ) : null}
           {!selected || access.canUpdate ? (
             <div className="mt-7 flex justify-end gap-3">
-              <Button onClick={() => setDrawerOpen(false)}>Cancel</Button>
+              <Button onClick={() => setDrawerOpen(false)}>{t("buttons.cancel")}</Button>
               <Button data-testid="submit-model" type="primary" htmlType="submit" loading={saving}>
-                {selected ? "Save Profile" : "Create Profile"}
+                {selected ? t("buttons.saveProfile") : t("buttons.createProfile")}
               </Button>
             </div>
           ) : null}

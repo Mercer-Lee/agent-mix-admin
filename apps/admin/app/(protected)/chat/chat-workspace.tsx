@@ -15,6 +15,7 @@ import {
 import { Button, Drawer, Empty, Input, Popconfirm, Select, Tag, Tooltip } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   cancelRunAction,
@@ -66,11 +67,6 @@ interface StreamPayload {
 }
 
 const TERMINAL_STATUSES: AgentRunStatus[] = ["completed", "failed", "canceled", "cancelled"];
-const conversationDateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "2-digit",
-  timeZone: "UTC",
-});
 
 function idempotencyKey(): string {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -112,9 +108,10 @@ function RunBadge({ run, streamStatus }: { run: AgentRun | null; streamStatus: S
 }
 
 function ToolActivityList({ activities }: { activities: ToolActivity[] }) {
+  const t = useTranslations("chat");
   if (!activities.length) return null;
   return (
-    <div className="mx-auto my-4 max-w-3xl space-y-2" aria-label="Tool activity">
+    <div className="mx-auto my-4 max-w-3xl space-y-2" aria-label={t("messages.toolActivity")}>
       {activities.map((activity) => (
         <div key={activity.key} className="flex items-center justify-between gap-4 border border-white/10 bg-black/30 px-3 py-2">
           <div className="flex items-center gap-2 text-xs text-zinc-400">
@@ -131,6 +128,7 @@ function ToolActivityList({ activities }: { activities: ToolActivity[] }) {
 }
 
 function MessageBubble({ message }: { message: ConversationMessage }) {
+  const t = useTranslations("chat");
   const assistant = message.role === "assistant";
   return (
     <article data-message-id={message.id} className={`mx-auto flex max-w-3xl gap-3 ${assistant ? "" : "flex-row-reverse"}`}>
@@ -139,7 +137,7 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
       </div>
       <div className={`min-w-0 max-w-[calc(100%-3rem)] border px-4 py-3 ${assistant ? "border-white/10 bg-[#111415]" : "border-white/10 bg-white/[0.04]"}`}>
         <p className="m-0 font-mono text-[10px] tracking-[0.16em] text-zinc-600 uppercase">
-          {assistant ? "Agent" : "You"}
+          {assistant ? t("messages.agent") : t("messages.you")}
         </p>
         {assistant ? (
           <SafeMarkdown content={message.content} />
@@ -160,6 +158,13 @@ function ConversationSidebar({
   selectedId?: string;
   onNavigate?: () => void;
 }) {
+  const t = useTranslations("chat");
+  const locale = useLocale();
+  const dateFormatter = useMemo(() => new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "2-digit",
+    timeZone: "UTC",
+  }), [locale]);
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-white/10 p-4">
@@ -168,7 +173,7 @@ function ConversationSidebar({
           onClick={onNavigate}
           className="flex items-center justify-center gap-2 border border-[#b8f500]/35 bg-[#b8f500]/10 px-3 py-2.5 text-sm font-medium text-[#caff24] no-underline hover:bg-[#b8f500]/15"
         >
-          <PlusOutlined /> New conversation
+          <PlusOutlined /> {t("sidebar.newConversation")}
         </Link>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -181,14 +186,14 @@ function ConversationSidebar({
               onClick={onNavigate}
               className={`mb-1 block border px-3 py-3 no-underline transition-colors ${active ? "border-[#b8f500]/30 bg-[#b8f500]/8 text-zinc-100" : "border-transparent text-zinc-500 hover:border-white/10 hover:bg-white/[0.025] hover:text-zinc-300"}`}
             >
-              <div className="truncate text-sm">{conversation.title || "Untitled conversation"}</div>
+              <div className="truncate text-sm">{conversation.title || t("sidebar.untitledConversation")}</div>
               <div className="mt-1 font-mono text-[10px] text-zinc-700">
-                {conversationDateFormatter.format(new Date(conversation.updatedAt))}
+                {dateFormatter.format(new Date(conversation.updatedAt))}
               </div>
             </Link>
           );
         }) : (
-          <div className="px-3 py-10 text-center text-xs text-zinc-700">No conversations yet</div>
+          <div className="px-3 py-10 text-center text-xs text-zinc-700">{t("sidebar.noConversations")}</div>
         )}
       </div>
     </div>
@@ -196,6 +201,7 @@ function ConversationSidebar({
 }
 
 export function ChatWorkspace({ initialAgents, initialConversations, initialDetail }: ChatWorkspaceProps) {
+  const t = useTranslations("chat");
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -343,7 +349,11 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
       setStreamStatus("closed");
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
-      if (status === "failed") setError(`Generation failed${payload.errorCode ? ` (${payload.errorCode})` : ""}.`);
+      if (status === "failed") {
+        setError(payload.errorCode
+          ? t("errors.generationFailedWithCode", { code: payload.errorCode })
+          : t("errors.generationFailed"));
+      }
       routerRef.current.refresh();
     }
 
@@ -446,7 +456,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
     if (!result.ok || !result.data) {
       setMessages((current) => current.filter((message) => message.id !== optimistic.id));
       setComposer(content);
-      setError(result.error ?? "Unable to send the message.");
+      setError(result.error ?? t("errors.sendFailed"));
       return;
     }
 
@@ -470,7 +480,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
     const result = await cancelRunAction(activeRun.id);
     if (!result.ok) {
       setCancelRequested(false);
-      setError(result.error ?? "Unable to stop the run.");
+      setError(result.error ?? t("errors.stopFailed"));
     }
   }
 
@@ -478,7 +488,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
     if (!conversation) return;
     const result = await deleteConversationAction(conversation.id);
     if (!result.ok) {
-      setError(result.error ?? "Unable to remove the conversation.");
+      setError(result.error ?? t("errors.removeFailed"));
       return;
     }
     eventSourceRef.current?.close();
@@ -501,17 +511,17 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
 
   let emptyState: ReactNode = null;
   if (!initialAgents.length) {
-    emptyState = <Empty description="No governed Agent is currently available to you" />;
+    emptyState = <Empty description={t("empty.noAgents")} />;
   } else if (!conversation && !messages.length) {
     emptyState = (
       <div className="mx-auto max-w-2xl py-16 text-center">
         <div className="mx-auto grid h-16 w-16 place-items-center border border-[#b8f500]/30 bg-[#b8f500]/5 text-2xl text-[#caff24]">
           <RobotOutlined />
         </div>
-        <p className="mt-6 font-mono text-xs tracking-[0.25em] text-[#b8f500] uppercase">Runtime workbench</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">Start a governed run</h1>
+        <p className="mt-6 font-mono text-xs tracking-[0.25em] text-[#b8f500] uppercase">{t("empty.workbench")}</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{t("empty.startRun")}</h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-zinc-500">
-          Every message creates an immutable execution snapshot, streams through BullMQ and records metadata for audit.
+          {t("empty.startRunDescription")}
         </p>
       </div>
     );
@@ -527,7 +537,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
         placement="left"
         size={300}
         open={mobileSidebarOpen}
-        title="Conversations"
+        title={t("sidebar.conversations")}
         onClose={() => setMobileSidebarOpen(false)}
         styles={{ body: { padding: 0 } }}
       >
@@ -541,13 +551,13 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#0d1011]/95 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Button className="md:hidden" type="text" icon={<MenuOutlined />} aria-label="Open conversations" onClick={() => setMobileSidebarOpen(true)} />
+            <Button className="md:hidden" type="text" icon={<MenuOutlined />} aria-label={t("sidebar.openConversations")} onClick={() => setMobileSidebarOpen(true)} />
             <div className="min-w-0">
               <p className="m-0 truncate text-sm font-medium text-zinc-200">
-                {conversation?.title || selectedAgent?.name || "New conversation"}
+                {conversation?.title || selectedAgent?.name || t("sidebar.newConversation")}
               </p>
               <p className="m-0 mt-0.5 truncate font-mono text-[10px] tracking-[0.14em] text-zinc-600 uppercase">
-                {selectedAgent ? `${selectedAgent.slug} / ${selectedAgent.id}` : "No runtime selected"}
+                {selectedAgent ? `${selectedAgent.slug} / ${selectedAgent.id}` : t("header.noRuntimeSelected")}
               </p>
             </div>
           </div>
@@ -555,14 +565,15 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
             <RunBadge run={activeRun} streamStatus={streamStatus} />
             {conversation ? (
               <Popconfirm
-                title="Remove this conversation?"
-                description="It will be hidden from your history but retained for authorized audit."
-                okText="Remove"
+                title={t("header.removeTitle")}
+                description={t("header.removeDescription")}
+                okText={t("header.remove")}
+                cancelText={t("header.cancel")}
                 okButtonProps={{ danger: true }}
                 onConfirm={() => void deleteConversation()}
               >
-                <Tooltip title="Remove conversation">
-                  <Button danger type="text" icon={<DeleteOutlined />} aria-label="Remove conversation" />
+                <Tooltip title={t("header.removeConversation")}>
+                  <Button danger type="text" icon={<DeleteOutlined />} aria-label={t("header.removeConversation")} />
                 </Tooltip>
               </Popconfirm>
             ) : null}
@@ -588,7 +599,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
               </div>
               <div className="min-w-0 flex-1 border border-[#b8f500]/20 bg-[#111415] px-4 py-3">
                 <p className="m-0 flex items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[#b8f500] uppercase">
-                  <span className="agentmix-signal h-1.5 w-1.5 bg-[#b8f500]" /> Streaming
+                  <span className="agentmix-signal h-1.5 w-1.5 bg-[#b8f500]" /> {t("messages.streaming")}
                 </p>
                 <SafeMarkdown content={partialText} />
               </div>
@@ -596,7 +607,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
           ) : null}
           {activeRun?.status === "failed" ? (
             <div className="mx-auto mt-5 max-w-3xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
-              The runtime stopped without a terminal response. Error code: {activeRun.errorCode ?? "RUN_FAILED"}
+              {t("errors.runFailed", { code: activeRun.errorCode ?? "RUN_FAILED" })}
             </div>
           ) : null}
           <div ref={bottomSentinelRef} aria-hidden="true" className="h-0" />
@@ -606,17 +617,17 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
           {error ? (
             <div className="mx-auto mb-3 flex max-w-4xl items-center justify-between gap-3 border border-red-400/20 bg-red-400/5 px-3 py-2 text-xs text-red-300">
               <span>{error}</span>
-              <Button type="text" size="small" icon={<CloseOutlined />} aria-label="Dismiss error" onClick={() => setError(null)} />
+              <Button type="text" size="small" icon={<CloseOutlined />} aria-label={t("errors.dismiss")} onClick={() => setError(null)} />
             </div>
           ) : null}
           <div className="mx-auto max-w-4xl">
             {!conversation ? (
               <Select
                 className="mb-2 w-full sm:max-w-md"
-                aria-label="Select Agent"
+                aria-label={t("composer.selectAgentAria")}
                 value={selectedAgentId || undefined}
                 options={agentOptions}
-                placeholder="Select an Agent"
+                placeholder={t("composer.selectAgentPlaceholder")}
                 onChange={setSelectedAgentId}
               />
             ) : null}
@@ -627,7 +638,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
                 variant="borderless"
                 value={composer}
                 disabled={!initialAgents.length || runIsActive}
-                placeholder={runIsActive ? "Wait for the active run or stop it…" : "Message the governed Agent…"}
+                placeholder={runIsActive ? t("composer.waitActiveRun") : t("composer.messagePlaceholder")}
                 onChange={(event) => setComposer(event.target.value)}
                 onCompositionStart={() => {
                   composingRef.current = true;
@@ -646,7 +657,7 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
                   loading={cancelRequested}
                   onClick={() => void cancelRun()}
                 >
-                  Stop
+                  {t("composer.stop")}
                 </Button>
               ) : (
                 <Button
@@ -658,12 +669,12 @@ export function ChatWorkspace({ initialAgents, initialConversations, initialDeta
                   disabled={!composer.trim() || !selectedAgentId}
                   onClick={() => void sendMessage()}
                 >
-                  Send
+                  {t("composer.send")}
                 </Button>
               )}
             </div>
             <p className="mb-0 mt-2 text-center font-mono text-[10px] text-zinc-700">
-              ENTER SENDS · SHIFT+ENTER ADDS A LINE · OUTPUT IS MARKDOWN-SANITIZED
+              {t("composer.hint")}
             </p>
           </div>
         </footer>

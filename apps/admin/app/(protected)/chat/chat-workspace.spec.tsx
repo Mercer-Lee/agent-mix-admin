@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import chatMessages from "../../../messages/en/chat.json";
 import { ChatWorkspace } from "./chat-workspace";
 import type { AgentRun, ChatAgent, ConversationDetailResponse, ConversationSummary } from "./types";
 
@@ -84,6 +86,16 @@ const detail: ConversationDetailResponse = {
   activeRun: run,
 };
 
+function renderWithIntl(ui: React.ReactElement) {
+  return render(ui, {
+    wrapper: ({ children }) => (
+      <NextIntlClientProvider locale="en" messages={{ chat: chatMessages }}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+  });
+}
+
 describe("ChatWorkspace", () => {
   beforeEach(() => {
     FakeEventSource.instances = [];
@@ -96,7 +108,7 @@ describe("ChatWorkspace", () => {
   });
 
   it("applies delta, tool status, reset and reconnect events", async () => {
-    render(<ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />);
+    renderWithIntl(<ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />);
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
@@ -122,7 +134,7 @@ describe("ChatWorkspace", () => {
   it("cancels the current queued or active run", async () => {
     mocks.cancel.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
-    render(<ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />);
+    renderWithIntl(<ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />);
 
     await user.click(screen.getByTestId("cancel-run"));
     await waitFor(() => expect(mocks.cancel).toHaveBeenCalledWith(run.id));
@@ -131,7 +143,7 @@ describe("ChatWorkspace", () => {
   it("clears a pending stop request when a different run becomes active", async () => {
     mocks.cancel.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
-    const { rerender } = render(
+    const { rerender } = renderWithIntl(
       <ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />,
     );
 
@@ -154,7 +166,7 @@ describe("ChatWorkspace", () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
     try {
-      render(<ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />);
+      renderWithIntl(<ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />);
       await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
       const source = FakeEventSource.instances[0]!;
       expect(scrollIntoView).toHaveBeenCalled();
@@ -168,7 +180,7 @@ describe("ChatWorkspace", () => {
   });
 
   it.each(["canceled", "cancelled"] as const)("renders %s runs as terminal", (status) => {
-    render(
+    renderWithIntl(
       <ChatWorkspace
         initialAgents={[agent]}
         initialConversations={[conversation]}
@@ -193,7 +205,7 @@ describe("ChatWorkspace", () => {
       messages: [...detail.messages, persistedAssistant],
       activeRun: null,
     };
-    const { container, rerender } = render(
+    const { container, rerender } = renderWithIntl(
       <ChatWorkspace initialAgents={[agent]} initialConversations={[conversation]} initialDetail={detail} />,
     );
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
@@ -221,7 +233,7 @@ describe("ChatWorkspace", () => {
   it("starts a conversation with a UUID idempotency key", async () => {
     mocks.create.mockResolvedValue({ ok: true, data: { conversation, run } });
     const user = userEvent.setup();
-    render(<ChatWorkspace initialAgents={[agent]} initialConversations={[]} />);
+    renderWithIntl(<ChatWorkspace initialAgents={[agent]} initialConversations={[]} />);
 
     await user.type(screen.getByTestId("chat-composer"), "Hello");
     await user.click(screen.getByTestId("send-message"));
@@ -238,7 +250,7 @@ describe("ChatWorkspace", () => {
   it("does not send Enter while an IME composition is active", async () => {
     mocks.create.mockResolvedValue({ ok: true, data: { conversation, run } });
     const user = userEvent.setup();
-    render(<ChatWorkspace initialAgents={[agent]} initialConversations={[]} />);
+    renderWithIntl(<ChatWorkspace initialAgents={[agent]} initialConversations={[]} />);
     const composer = screen.getByTestId("chat-composer");
 
     await user.type(composer, "你好");
@@ -252,7 +264,7 @@ describe("ChatWorkspace", () => {
   });
 
   it("keeps the composer in the flex viewport instead of using a fixed header offset", () => {
-    const { container } = render(<ChatWorkspace initialAgents={[agent]} initialConversations={[]} />);
+    const { container } = renderWithIntl(<ChatWorkspace initialAgents={[agent]} initialConversations={[]} />);
     const workspace = container.querySelector("main");
     const footer = container.querySelector("footer");
 

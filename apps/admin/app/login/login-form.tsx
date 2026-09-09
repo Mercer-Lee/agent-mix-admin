@@ -2,6 +2,7 @@
 
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { Alert, Button, Form, Input } from "antd";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,6 +12,7 @@ interface LoginFields {
 }
 
 export function LoginForm() {
+  const t = useTranslations("login");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -27,16 +29,14 @@ export function LoginForm() {
       });
       if (!response.ok) {
         setError(
-          response.status === 429
-            ? "Too many sign-in attempts. Try again later."
-            : "The username or password is incorrect.",
+          response.status === 429 ? t("rateLimited") : t("invalidCredentials"),
         );
         return;
       }
       router.replace("/");
       router.refresh();
     } catch {
-      setError("The authentication service is temporarily unavailable.");
+      setError(t("serviceUnavailable"));
     } finally {
       setSubmitting(false);
     }
@@ -47,8 +47,8 @@ export function LoginForm() {
       {error ? <Alert data-testid="login-error" className="mb-5" type="error" showIcon title={error} /> : null}
       <Form.Item
         name="username"
-        label="Username"
-        rules={[{ required: true, message: "Enter your username" }]}
+        label={t("usernameLabel")}
+        rules={[{ required: true, message: t("usernameRequired") }]}
       >
         <Input
           data-testid="login-username"
@@ -60,10 +60,10 @@ export function LoginForm() {
       </Form.Item>
       <Form.Item
         name="password"
-        label="Password"
+        label={t("passwordLabel")}
         rules={[
-          { required: true, message: "Enter your password" },
-          { min: 12, message: "Password must contain at least 12 characters" },
+          { required: true, message: t("passwordRequired") },
+          { min: 12, message: t("passwordMin") },
         ]}
       >
         <Input.Password
@@ -82,7 +82,7 @@ export function LoginForm() {
         size="large"
         loading={submitting}
       >
-        Verify identity and enter
+        {t("submit")}
       </Button>
     </Form>
   );

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { ServerApiError, serverApi } from "../../_lib/server-api";
 import type { ModelCheckSummary, ModelProfile, ModelProfileMutationInput } from "./types";
 
@@ -10,13 +11,14 @@ interface ModelActionResult<T> {
   error?: string;
 }
 
-function actionError(error: unknown): ModelActionResult<never> {
+async function actionError(error: unknown): Promise<ModelActionResult<never>> {
+  const t = await getTranslations("models.actions");
   if (error instanceof ServerApiError) {
-    if (error.status === 403) return { ok: false, error: "Your account cannot change model governance." };
-    if (error.status === 409) return { ok: false, error: "This model profile key is already in use." };
-    if (error.status === 400) return { ok: false, error: `Invalid model profile: ${error.message}` };
+    if (error.status === 403) return { ok: false, error: t("forbidden") };
+    if (error.status === 409) return { ok: false, error: t("conflict") };
+    if (error.status === 400) return { ok: false, error: t("invalid", { message: error.message }) };
   }
-  return { ok: false, error: "The model control service is temporarily unavailable." };
+  return { ok: false, error: t("serviceUnavailable") };
 }
 
 function publicPayload(input: ModelProfileMutationInput, includeKey = false) {
@@ -40,7 +42,7 @@ export async function createModelAction(
     revalidatePath("/models");
     return { ok: true, data: model };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }
 
@@ -56,7 +58,7 @@ export async function updateModelAction(
     revalidatePath("/models");
     return { ok: true, data: model };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }
 
@@ -66,6 +68,6 @@ export async function checkModelAction(modelId: string): Promise<ModelActionResu
     revalidatePath("/models");
     return { ok: true, data: check };
   } catch (error) {
-    return actionError(error);
+    return await actionError(error);
   }
 }

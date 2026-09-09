@@ -1,0 +1,78 @@
+{
+  "app": {
+    "meta": {
+      "title": "AgentMix Admin",
+      "description": "Enterprise administration and agent governance framework"
+    },
+    "brand": {
+      "eyebrow": "Control Plane",
+      "name": "AgentMix Admin"
+    },
+    "nav": {
+      "overview": "Overview",
+      "models": "Models",
+      "agents": "Agents",
+      "workbench": "Workbench",
+      "audit": "Audit"
+    },
+    "navAria": "Main navigation",
+    "trigger": {
+      "open": "Open navigation",
+      "expand": "Expand navigation",
+      "collapse": "Collapse navigation"
+    },
+    "language": "Language",
+    "signOut": "Sign out"
+  },
+  "overview": {
+    "eyebrow": "Control plane / live status",
+    "headline": "Govern agents like every other critical enterprise resource.",
+    "intro": "The control plane defines identity, authorization, runtime and audit boundaries. Health signals below are read from the live server rather than assumed from configuration.",
+    "postgresTitle": "database / PostgreSQL",
+    "postgresDetail": "Control-plane persistence",
+    "healthUnavailable": "Health endpoint unavailable",
+    "redisTitle": "event bus / Redis",
+    "redisDetail": "Run tasks, events and cancellation",
+    "runtimeTitle": "agent runtime",
+    "workerCount": "{count, plural, =1 {1 worker registered} other {# workers registered}}",
+    "workerUnknown": "Worker presence cannot be determined",
+    "activeSubject": "Active subject",
+    "roles": "Roles",
+    "effectivePermissions": "{count, plural, =1 {1 effective permission} other {# effective permissions}}"
+  },
+  "statusCard": {
+    "status": {
+      "ok": "Operational",
+      "warn": "Warning",
+      "down": "Down",
+      "unknown": "Unknown"
+    }
+  },
+  "login": {
+    "eyebrow": "AgentMix / Enterprise Control Plane",
+    "headline1": "Governance first.",
+    "headline2": "Agents ready for enterprise.",
+    "copy": "Identity, roles, tool access, and cost all return to one verifiable governance boundary.",
+    "signal": "CONTROL PLANE ONLINE",
+    "panelAria": "AgentMix sign in",
+    "authTag": "AUTH / 01",
+    "sessionTag": "SESSION: 12H",
+    "enterHeading": "Enter the admin console",
+    "enterHint": "Use the internal account assigned by your administrator.",
+    "usernameLabel": "Username",
+    "usernameRequired": "Enter your username",
+    "passwordLabel": "Password",
+    "passwordRequired": "Enter your password",
+    "passwordMin": "Password must contain at least 12 characters",
+    "submit": "Verify identity and enter",
+    "rateLimited": "Too many sign-in attempts. Try again later.",
+    "invalidCredentials": "The username or password is incorrect.",
+    "serviceUnavailable": "The authentication service is temporarily unavailable."
+  },
+  "errors": {
+    "title": "This page could not be loaded",
+    "subTitleWithDigest": "The request failed and was stopped. Reference: {digest}",
+    "subTitle": "The control plane rejected or failed the request. Retry, or navigate back to a reachable page.",
+    "tryAgain": "Try again"
+  }
+}

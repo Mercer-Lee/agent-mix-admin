@@ -2,6 +2,7 @@
 
 import { ReloadOutlined } from "@ant-design/icons";
 import { Button, Result } from "antd";
+import { useTranslations } from "next-intl";
 
 interface ProtectedErrorProps {
   error: Error & { digest?: string };
@@ -9,19 +10,17 @@ interface ProtectedErrorProps {
 }
 
 export default function ProtectedError({ error, reset }: ProtectedErrorProps) {
+  const t = useTranslations("errors");
+
   return (
-    <main className="agentmix-grid flex min-h-[calc(100vh-74px)] items-center justify-center px-4">
+    <main className="agentmix-grid flex min-h-[calc(100dvh-3.5rem)] items-center justify-center px-4">
       <Result
         status="error"
-        title="This page could not be loaded"
-        subTitle={
-          error.digest
-            ? `The request failed and was stopped. Reference: ${error.digest}`
-            : "The control plane rejected or failed the request. Retry, or navigate back to a reachable page."
-        }
+        title={t("title")}
+        subTitle={error.digest ? t("subTitleWithDigest", { digest: error.digest }) : t("subTitle")}
         extra={
           <Button type="primary" icon={<ReloadOutlined />} onClick={() => reset()}>
-            Try again
+            {t("tryAgain")}
           </Button>
         }
       />

@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import commonMessages from "../../messages/en/common.json";
 import { LoginForm } from "./login-form";
 
 const replace = vi.fn();
@@ -9,6 +11,14 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, refresh }),
 }));
+
+function renderWithIntl(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={{ login: commonMessages.login }}>
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
 
 describe("LoginForm", () => {
   afterEach(() => {
@@ -21,7 +31,7 @@ describe("LoginForm", () => {
   it("submits credentials and enters the console", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderWithIntl(<LoginForm />);
 
     await user.type(screen.getByTestId("login-username"), "admin");
     await user.type(screen.getByTestId("login-password"), "correct-horse-battery-staple");
@@ -38,7 +48,7 @@ describe("LoginForm", () => {
 
   it("shows one generic error for rejected credentials", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 401 }));
-    render(<LoginForm />);
+    renderWithIntl(<LoginForm />);
 
     fireEvent.change(screen.getByTestId("login-username"), { target: { value: "admin" } });
     fireEvent.change(screen.getByTestId("login-password"), { target: { value: "incorrect-password" } });

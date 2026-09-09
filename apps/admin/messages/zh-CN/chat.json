@@ -1,0 +1,53 @@
+{
+  "sidebar": {
+    "newConversation": "新建会话",
+    "untitledConversation": "未命名会话",
+    "noConversations": "暂无会话",
+    "conversations": "会话列表",
+    "openConversations": "打开会话列表"
+  },
+  "header": {
+    "noRuntimeSelected": "未选择运行时",
+    "removeConversation": "移除会话",
+    "removeTitle": "移除此会话？",
+    "removeDescription": "该会话将从你的历史记录中隐藏，但仍会保留以供授权审计。",
+    "remove": "移除",
+    "cancel": "取消"
+  },
+  "messages": {
+    "agent": "Agent",
+    "you": "你",
+    "streaming": "流式输出中",
+    "toolActivity": "工具活动"
+  },
+  "empty": {
+    "noAgents": "当前没有你可以使用的受治理 Agent",
+    "workbench": "运行时工作台",
+    "startRun": "发起受治理的 Run",
+    "startRunDescription": "每条消息都会创建不可变的执行快照，经 BullMQ 流式传输，并记录用于审计的元数据。"
+  },
+  "composer": {
+    "selectAgentAria": "选择 Agent",
+    "selectAgentPlaceholder": "选择一个 Agent",
+    "waitActiveRun": "请等待当前 Run 结束，或将其停止…",
+    "messagePlaceholder": "向受治理的 Agent 发送消息…",
+    "stop": "停止",
+    "send": "发送",
+    "hint": "Enter 发送消息，Shift+Enter 换行，输出内容经 Markdown 净化处理。"
+  },
+  "errors": {
+    "dismiss": "关闭错误提示",
+    "sendFailed": "无法发送消息。",
+    "stopFailed": "无法停止该 Run。",
+    "removeFailed": "无法移除该会话。",
+    "generationFailed": "生成失败。",
+    "generationFailedWithCode": "生成失败（{code}）。",
+    "runFailed": "运行时在本次 Run 完成前已停止。错误代码：{code}"
+  },
+  "actions": {
+    "forbidden": "你无权调用此 Agent。",
+    "unavailable": "该会话或 Agent 当前不可用。",
+    "invalidMessage": "消息无效：{message}",
+    "serviceUnavailable": "会话服务暂时不可用。"
+  }
+}

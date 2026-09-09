@@ -1,8 +1,18 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import auditMessages from "../../../messages/en/audit.json";
 import { AuditConsole } from "./audit-console";
 import type { AuditEvent, ConversationAuditSummary, PaginatedResponse } from "./types";
+
+function renderWithIntl(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={{ audit: auditMessages }}>
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
 
 const event: AuditEvent = {
   id: "019d2f5b-a8ab-7000-8000-000000000001",
@@ -41,7 +51,7 @@ describe("AuditConsole", () => {
   });
 
   it("redacts content-like keys from ordinary audit metadata", () => {
-    render(<AuditConsole events={events} conversations={null} canReadContent={false} />);
+    renderWithIntl(<AuditConsole events={events} conversations={null} canReadContent={false} />);
     expect(screen.getByText(/"status":"active"/)).toBeInTheDocument();
     expect(screen.queryByText(/SECRET_SENTINEL/)).not.toBeInTheDocument();
   });
@@ -51,7 +61,7 @@ describe("AuditConsole", () => {
       new Response(JSON.stringify(conversation), { status: 200 }),
     );
     const user = userEvent.setup();
-    render(<AuditConsole events={null} conversations={conversations} canReadContent={false} />);
+    renderWithIntl(<AuditConsole events={null} conversations={conversations} canReadContent={false} />);
 
     await user.click(screen.getByTestId(`audit-conversation-${conversation.id}`));
     expect(await screen.findByText("Message bodies are protected")).toBeInTheDocument();
@@ -75,7 +85,7 @@ describe("AuditConsole", () => {
       return new Response(JSON.stringify(conversation), { status: 200 });
     });
     const user = userEvent.setup();
-    render(<AuditConsole events={null} conversations={conversations} canReadContent />);
+    renderWithIntl(<AuditConsole events={null} conversations={conversations} canReadContent />);
 
     await user.click(screen.getByTestId(`audit-conversation-${conversation.id}`));
     await waitFor(() => expect(screen.getByText("Audited answer")).toBeInTheDocument());
@@ -103,7 +113,7 @@ describe("AuditConsole", () => {
       return new Response(JSON.stringify(conversationB), { status: 200 });
     });
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <AuditConsole
         events={null}
         conversations={{ items: [conversationA, conversationB], total: 2, page: 1, pageSize: 50 }}
@@ -126,7 +136,7 @@ describe("AuditConsole", () => {
 
   it("keeps both server-rendered audit cursors reachable through URL pagination", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <AuditConsole
         events={{ ...events, page: 2, total: 101 }}
         conversations={{ ...conversations, total: 101 }}

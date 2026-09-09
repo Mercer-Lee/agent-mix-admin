@@ -34,6 +34,7 @@ import {
   Typography,
   type TableProps,
 } from "antd";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import {
@@ -90,15 +91,6 @@ interface AccessFormValues {
   departments: Array<{ departmentId: string; includeDescendants: boolean }>;
 }
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "UTC",
-});
-
 class ApiRequestError extends Error {
   constructor(readonly status: number) {
     super(`Request failed with status ${status}`);
@@ -147,6 +139,20 @@ export function AgentsManager({
   access,
 }: AgentsManagerProps) {
   const router = useRouter();
+  const t = useTranslations("agents");
+  const locale = useLocale();
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "UTC",
+      }),
+    [locale],
+  );
   const [profileForm] = Form.useForm<ProfileFormValues>();
   const [roleForm] = Form.useForm<{ roleIds: string[] }>();
   const [permissionForm] = Form.useForm<{ permissionIds: string[] }>();
@@ -222,7 +228,7 @@ export function AgentsManager({
     const merged = new Map(modelProfiles.map((profile) => [profile.id, profile]));
     if (runtime?.modelProfile) merged.set(runtime.modelProfile.id, runtime.modelProfile);
     return [...merged.values()].map((profile) => ({
-      label: `${profile.name} / ${profile.modelId}${profile.status === "disabled" ? " (disabled)" : ""}`,
+      label: `${profile.name} / ${profile.modelId}${profile.status === "disabled" ? ` ${t("runtime.modelDisabledSuffix")}` : ""}`,
       value: profile.id,
       disabled: profile.status === "disabled" && profile.id !== runtime?.modelProfileId,
     }));
@@ -352,11 +358,11 @@ export function AgentsManager({
     } catch (requestError) {
       if (controller.signal.aborted || !isCurrentDetailRequest(generation, agent.id)) return;
       if (requestError instanceof ApiRequestError && requestError.status === 403) {
-        setError("Your permissions changed before this Agent could be loaded. Refresh the page to update the available governance sections.");
+        setError(t("errors.permissionChanged"));
       } else if (requestError instanceof ApiRequestError && requestError.status === 404) {
-        setError("This Agent no longer exists or is no longer available.");
+        setError(t("errors.notFound"));
       } else {
-        setError("Unable to load the complete agent governance record. Refresh the page and try again.");
+        setError(t("errors.loadFailed"));
       }
     } finally {
       if (isCurrentDetailRequest(generation, agent.id)) setLoadingDetail(false);
@@ -387,7 +393,7 @@ export function AgentsManager({
       setUserDirectoryTotal(response.total);
     } catch {
       if (controller.signal.aborted || generation !== userSearchGenerationRef.current) return;
-      setUserDirectoryError("User directory search is temporarily unavailable. Existing grants are preserved.");
+      setUserDirectoryError(t("access.userSearchUnavailable"));
     } finally {
       if (generation === userSearchGenerationRef.current) setLoadingUsers(false);
     }
@@ -475,7 +481,7 @@ export function AgentsManager({
     });
     setSavingSection(null);
     if (!result.ok) {
-      setError(result.error ?? "Unable to create the agent.");
+      setError(result.error ?? t("errors.createFailed"));
       return;
     }
     closeDrawer();
@@ -491,11 +497,11 @@ export function AgentsManager({
     const result = await updateAgentProfileAction(selected.id, values);
     setSavingSection(null);
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to save the agent profile.");
+      setError(result.error ?? t("errors.profileFailed"));
       return;
     }
     setSelected(result.data);
-    setNotice("Profile boundary saved independently.");
+    setNotice(t("notices.profileSaved"));
     router.refresh();
   }
 
@@ -508,17 +514,17 @@ export function AgentsManager({
     const result = await updateAgentRolesAction(selected.id, values.roleIds ?? []);
     if (!result.ok) {
       setSavingSection(null);
-      setError(result.error ?? "Unable to save inherited roles.");
+      setError(result.error ?? t("errors.rolesFailed"));
       return;
     }
     const refreshed = await refreshAuthorizationSurface(selected.id);
     setSavingSection(null);
     if (refreshed === null) return;
     if (!refreshed) {
-      setError("Inherited roles were saved, but the latest capability surface could not be loaded.");
+      setError(t("errors.rolesSurfaceFailed"));
       return;
     }
-    setNotice("Inherited roles saved. Direct permissions were not changed.");
+    setNotice(t("notices.rolesSaved"));
     router.refresh();
   }
 
@@ -531,17 +537,17 @@ export function AgentsManager({
     const result = await updateAgentPermissionsAction(selected.id, values.permissionIds ?? []);
     if (!result.ok) {
       setSavingSection(null);
-      setError(result.error ?? "Unable to save direct permissions.");
+      setError(result.error ?? t("errors.permissionsFailed"));
       return;
     }
     const refreshed = await refreshAuthorizationSurface(selected.id);
     setSavingSection(null);
     if (refreshed === null) return;
     if (!refreshed) {
-      setError("Direct permissions were saved, but the latest capability surface could not be loaded.");
+      setError(t("errors.permissionsSurfaceFailed"));
       return;
     }
-    setNotice("Direct permissions saved. Role assignments were not changed.");
+    setNotice(t("notices.permissionsSaved"));
     router.refresh();
   }
 
@@ -575,11 +581,11 @@ export function AgentsManager({
     const result = await updateAgentRuntimeAction(selected.id, values);
     setSavingSection(null);
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to save the Agent runtime.");
+      setError(result.error ?? t("errors.runtimeFailed"));
       return;
     }
     setRuntime(result.data);
-    setNotice("Runtime snapshot settings saved independently.");
+    setNotice(t("notices.runtimeSaved"));
     router.refresh();
   }
 
@@ -599,17 +605,17 @@ export function AgentsManager({
     });
     setSavingSection(null);
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to save Agent invocation access.");
+      setError(result.error ?? t("errors.accessFailed"));
       return;
     }
     setInvocationAccess(result.data);
-    setNotice("Invocation grants saved. Invoke permission is still required for every actor.");
+    setNotice(t("notices.accessSaved"));
     router.refresh();
   }
 
   const columns: TableProps<AgentSummary>["columns"] = [
     {
-      title: "Agent",
+      title: t("table.agent"),
       key: "agent",
       render: (_, agent) => (
         <div className="min-w-48">
@@ -628,20 +634,20 @@ export function AgentsManager({
       ),
     },
     {
-      title: "Status",
+      title: t("table.status"),
       dataIndex: "status",
       width: 110,
       render: (value: AgentSummary["status"]) =>
-        value === "active" ? <Tag color="lime">Active</Tag> : <Tag>Disabled</Tag>,
+        value === "active" ? <Tag color="lime">{t("status.active")}</Tag> : <Tag>{t("status.disabled")}</Tag>,
     },
     {
-      title: "Description",
+      title: t("table.description"),
       dataIndex: "description",
       ellipsis: true,
       render: (value: string) => <span className="text-zinc-400">{value || "—"}</span>,
     },
     {
-      title: "Updated",
+      title: t("table.updated"),
       dataIndex: "updatedAt",
       width: 170,
       render: (value: string) => (
@@ -659,7 +665,7 @@ export function AgentsManager({
           icon={canManageAny ? <EditOutlined /> : <ApiOutlined />}
           onClick={() => void openDetail(agent)}
         >
-          {canManageAny ? "Manage" : "View"}
+          {canManageAny ? t("table.manage") : t("table.view")}
         </Button>
       ),
     },
@@ -672,43 +678,43 @@ export function AgentsManager({
           forceRender: true,
           label: (
             <span data-testid="agent-tab-profile">
-              <UserOutlined /> Profile
+              <UserOutlined /> {t("tabs.profile")}
             </span>
           ),
           children: (
             <div className="pt-4">
               <SectionHeading
                 icon={<UserOutlined />}
-                title="Profile"
-                detail="Identity metadata and lifecycle state are saved without touching capabilities, runtime or grants."
+                title={t("profile.heading")}
+                detail={t("profile.headingDetail")}
               />
               <Descriptions className="mb-6" size="small" column={2} bordered>
-                <Descriptions.Item label="Subject ID" span={2}>
+                <Descriptions.Item label={t("profile.subjectId")} span={2}>
                   <Typography.Text copyable className="font-mono text-xs">
                     {selected.id}
                   </Typography.Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="System resource">{selected.isSystem ? "Yes" : "No"}</Descriptions.Item>
-                <Descriptions.Item label="Created">
+                <Descriptions.Item label={t("profile.systemResource")}>{selected.isSystem ? t("status.yes") : t("status.no")}</Descriptions.Item>
+                <Descriptions.Item label={t("profile.created")}>
                   {dateFormatter.format(new Date(selected.createdAt))}
                 </Descriptions.Item>
               </Descriptions>
               <Form<ProfileFormValues> form={profileForm} layout="vertical" requiredMark={false} clearOnDestroy>
-                <Form.Item name="slug" label="Unique slug">
+                <Form.Item name="slug" label={t("form.slug")}>
                   <Input disabled />
                 </Form.Item>
-                <Form.Item name="name" label="Display name" rules={[{ required: true }, { max: 120 }]}>
+                <Form.Item name="name" label={t("form.name")} rules={[{ required: true }, { max: 120 }]}>
                   <Input disabled={!access.canUpdateProfile} />
                 </Form.Item>
-                <Form.Item name="description" label="Responsibilities" rules={[{ max: 2000 }]}>
+                <Form.Item name="description" label={t("form.description")} rules={[{ max: 2000 }]}>
                   <Input.TextArea rows={4} disabled={!access.canUpdateProfile} />
                 </Form.Item>
-                <Form.Item name="status" label="Lifecycle status" rules={[{ required: true }]}>
+                <Form.Item name="status" label={t("form.lifecycleStatus")} rules={[{ required: true }]}>
                   <Select
                     disabled={!access.canUpdateProfile}
                     options={[
-                      { label: "Active", value: "active" },
-                      { label: "Disabled", value: "disabled" },
+                      { label: t("status.active"), value: "active" },
+                      { label: t("status.disabled"), value: "disabled" },
                     ]}
                   />
                 </Form.Item>
@@ -720,7 +726,7 @@ export function AgentsManager({
                       loading={savingSection === "profile"}
                       onClick={() => void saveProfile()}
                     >
-                      Save Profile
+                      {t("profile.save")}
                     </Button>
                   </div>
                 ) : null}
@@ -733,31 +739,31 @@ export function AgentsManager({
           forceRender: true,
           label: (
             <span data-testid="agent-tab-capabilities">
-              <AppstoreOutlined /> Capabilities
+              <AppstoreOutlined /> {t("tabs.capabilities")}
             </span>
           ),
           children: (
             <div className="pt-4">
               <SectionHeading
                 icon={<SafetyCertificateOutlined />}
-                title="Capabilities"
-                detail="The runtime only exposes a capability when both the actor and this Agent currently hold its required permissions."
+                title={t("capabilities.heading")}
+                detail={t("capabilities.headingDetail")}
               />
               <Alert
                 className="mb-6"
                 type="info"
                 showIcon
-                title="ACTOR ∩ AGENT"
-                description="Inherited roles and direct permissions are separate authorization boundaries and save independently."
+                title={t("capabilities.boundaryTitle")}
+                description={t("capabilities.boundaryDetail")}
               />
               <Form form={roleForm} layout="vertical" clearOnDestroy>
-                <Form.Item name="roleIds" label="Inherited roles">
+                <Form.Item name="roleIds" label={t("capabilities.inheritedRoles")}>
                   <Select
                     mode="multiple"
                     disabled={!access.canAssignRoles}
                     options={roleOptions}
                     optionFilterProp="label"
-                    placeholder="Select roles inherited by this Agent"
+                    placeholder={t("capabilities.inheritedRolesPlaceholder")}
                   />
                 </Form.Item>
                 {access.canAssignRoles ? (
@@ -767,19 +773,19 @@ export function AgentsManager({
                       loading={savingSection === "roles"}
                       onClick={() => void saveRoles()}
                     >
-                      Save Inherited Roles
+                      {t("capabilities.saveInheritedRoles")}
                     </Button>
                   </div>
                 ) : null}
               </Form>
               <Form form={permissionForm} layout="vertical" clearOnDestroy>
-                <Form.Item name="permissionIds" label="Direct permissions">
+                <Form.Item name="permissionIds" label={t("capabilities.directPermissions")}>
                   <Select
                     mode="multiple"
                     disabled={!access.canAssignPermissions}
                     options={permissionOptions}
                     optionFilterProp="label"
-                    placeholder="Select least-privilege direct permissions"
+                    placeholder={t("capabilities.directPermissionsPlaceholder")}
                   />
                 </Form.Item>
                 {access.canAssignPermissions ? (
@@ -789,7 +795,7 @@ export function AgentsManager({
                       loading={savingSection === "permissions"}
                       onClick={() => void savePermissions()}
                     >
-                      Save Direct Permissions
+                      {t("capabilities.saveDirectPermissions")}
                     </Button>
                   </div>
                 ) : null}
@@ -798,15 +804,15 @@ export function AgentsManager({
                 <Alert
                   type="warning"
                   showIcon
-                  title="Latest capability surface unavailable"
-                  description="The authorization update was saved, but this Drawer will not display the previous effective permissions as if they were current. Close and reopen it to retry."
+                  title={t("capabilities.surfaceUnavailableTitle")}
+                  description={t("capabilities.surfaceUnavailableDetail")}
                 />
               ) : (
                 <section className="border border-white/10 bg-black/20 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="font-medium">Effective capability surface</span>
+                    <span className="font-medium">{t("capabilities.effectiveSurface")}</span>
                     <span className="font-mono text-xs text-zinc-600">
-                      {selected.effectivePermissions.length} effective permissions
+                      {t("capabilities.effectiveCount", { count: selected.effectivePermissions.length })}
                     </span>
                   </div>
                   {capabilities.length ? (
@@ -824,7 +830,7 @@ export function AgentsManager({
                       ))}
                     </div>
                   ) : (
-                    <p className="m-0 text-sm text-zinc-600">No capabilities are currently exposed.</p>
+                    <p className="m-0 text-sm text-zinc-600">{t("capabilities.noCapabilities")}</p>
                   )}
                 </section>
               )}
@@ -836,60 +842,60 @@ export function AgentsManager({
           forceRender: true,
           label: (
             <span data-testid="agent-tab-runtime">
-              <SettingOutlined /> Runtime
+              <SettingOutlined /> {t("tabs.runtime")}
             </span>
           ),
           children: (
             <div className="pt-4">
               <SectionHeading
                 icon={<RobotOutlined />}
-                title="Runtime"
-                detail="A run captures an immutable snapshot of these settings before it is placed on the BullMQ runtime queue."
+                title={t("runtime.heading")}
+                detail={t("runtime.headingDetail")}
               />
               {!runtime?.configured ? (
                 <Alert
                   className="mb-5"
                   type="warning"
                   showIcon
-                  title="Runtime configuration is not available"
-                  description="The Agent cannot be invoked until a model profile and system prompt are configured."
+                  title={t("runtime.notConfiguredTitle")}
+                  description={t("runtime.notConfiguredDetail")}
                 />
               ) : null}
               <Form<RuntimeFormValues> form={runtimeForm} layout="vertical" requiredMark={false} clearOnDestroy>
                 <Form.Item
                   name="modelProfileId"
-                  label="Model profile"
-                  rules={[{ required: true, message: "Select an active model profile" }]}
+                  label={t("runtime.modelProfile")}
+                  rules={[{ required: true, message: t("runtime.modelProfileRequired") }]}
                 >
                   <Select
                     data-testid="agent-runtime-model"
                     disabled={!access.canConfigureRuntime}
                     options={modelOptions}
                     optionFilterProp="label"
-                    placeholder="Select a governed profile"
+                    placeholder={t("runtime.modelProfilePlaceholder")}
                   />
                 </Form.Item>
                 <Form.Item
                   name="systemPrompt"
-                  label="System prompt"
+                  label={t("runtime.systemPrompt")}
                   rules={[{ required: true }, { max: 20_000 }]}
                 >
                   <Input.TextArea
                     data-testid="agent-system-prompt"
                     rows={10}
                     disabled={!access.canConfigureRuntime}
-                    placeholder="Define responsibility, safety and response boundaries."
+                    placeholder={t("runtime.systemPromptPlaceholder")}
                   />
                 </Form.Item>
                 <Form.Item
                   name="maxOutputTokens"
-                  label="Maximum output tokens"
+                  label={t("runtime.maxOutputTokens")}
                   rules={[{ required: true, type: "number", min: 1, max: 32_768 }]}
                 >
                   <InputNumber className="w-full" disabled={!access.canConfigureRuntime} min={1} max={32_768} />
                 </Form.Item>
                 <p className="font-mono text-xs leading-5 text-zinc-600">
-                  Provider connection, API key and base URL are Worker environment settings and are never returned to this page.
+                  {t("runtime.envNote")}
                 </p>
                 {access.canConfigureRuntime ? (
                   <div className="flex justify-end">
@@ -899,7 +905,7 @@ export function AgentsManager({
                       loading={savingSection === "runtime"}
                       onClick={() => void saveRuntime()}
                     >
-                      Save Runtime
+                      {t("runtime.save")}
                     </Button>
                   </div>
                 ) : null}
@@ -912,31 +918,31 @@ export function AgentsManager({
           forceRender: true,
           label: (
             <span data-testid="agent-tab-access">
-              <TeamOutlined /> Who can invoke
+              <TeamOutlined /> {t("tabs.access")}
             </span>
           ),
           children: (
             <div className="pt-4">
               <SectionHeading
                 icon={<TeamOutlined />}
-                title="Who can invoke"
-                detail="User, role and department grants are positive OR rules. Every caller must also hold agents:invoke; no role bypasses explicit grants."
+                title={t("access.heading")}
+                detail={t("access.headingDetail")}
               />
               <Alert
                 className="mb-6"
                 type="warning"
                 showIcon
                 icon={<LockOutlined />}
-                title="No grants means no access"
-                description="Even super-admin requires an explicit user, role or department grant for this Agent."
+                title={t("access.noGrantsTitle")}
+                description={t("access.noGrantsDetail")}
               />
               {!access.canReadUsers ? (
                 <Alert
                   className="mb-5"
                   type="info"
                   showIcon
-                  title="User directory permission is required to change named-user grants"
-                  description="Existing named-user grants remain attached and will be preserved when role or department grants are saved."
+                  title={t("access.userDirRequiredTitle")}
+                  description={t("access.userDirRequiredDetail")}
                 />
               ) : null}
               {!access.canReadRoles ? (
@@ -944,8 +950,8 @@ export function AgentsManager({
                   className="mb-5"
                   type="info"
                   showIcon
-                  title="Role directory permission is required to change role grants"
-                  description="Existing role grants remain attached and will be preserved when other invocation grants are saved."
+                  title={t("access.roleDirRequiredTitle")}
+                  description={t("access.roleDirRequiredDetail")}
                 />
               ) : null}
               {!access.canReadDepartments ? (
@@ -953,17 +959,17 @@ export function AgentsManager({
                   className="mb-5"
                   type="info"
                   showIcon
-                  title="Department directory permission is required to change department grants"
-                  description="Existing department grants and descendant scope remain attached and will be preserved when other invocation grants are saved."
+                  title={t("access.departmentDirRequiredTitle")}
+                  description={t("access.departmentDirRequiredDetail")}
                 />
               ) : null}
               {userDirectoryError ? (
                 <Alert className="mb-5" type="warning" showIcon title={userDirectoryError} />
               ) : null}
               <Form<AccessFormValues> form={invocationForm} layout="vertical" requiredMark={false} clearOnDestroy>
-                <Form.Item name="userIds" label="Users">
+                <Form.Item name="userIds" label={t("access.users")}>
                   <Select
-                    aria-label="User grant candidates"
+                    aria-label={t("access.userCandidatesAria")}
                     data-testid="agent-user-grants"
                     mode="multiple"
                     showSearch
@@ -973,27 +979,27 @@ export function AgentsManager({
                     filterOption={false}
                     onSearch={scheduleUserSearch}
                     onPopupScroll={loadMoreUsers}
-                    placeholder={access.canReadUsers ? "Search the user directory" : "User directory access required"}
+                    placeholder={access.canReadUsers ? t("access.userSearchPlaceholder") : t("access.userDirectoryRequiredPlaceholder")}
                   />
                 </Form.Item>
-                <Form.Item name="roleIds" label="Roles">
+                <Form.Item name="roleIds" label={t("access.roles")}>
                   <Select
-                    aria-label="Role grant candidates"
+                    aria-label={t("access.roleCandidatesAria")}
                     mode="multiple"
                     disabled={!access.canReadRoles}
                     options={roleOptions}
                     optionFilterProp="label"
-                    placeholder="Grant role holders"
+                    placeholder={t("access.rolePlaceholder")}
                   />
                 </Form.Item>
                 <Form.List name="departments">
                   {(fields, { add, remove }) => (
                     <div>
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm text-zinc-300">Departments</span>
+                        <span className="text-sm text-zinc-300">{t("access.departments")}</span>
                         {access.canReadDepartments ? (
                           <Button size="small" icon={<PlusOutlined />} onClick={() => add({ includeDescendants: false })}>
-                            Add Department
+                            {t("access.addDepartment")}
                           </Button>
                         ) : null}
                       </div>
@@ -1004,14 +1010,14 @@ export function AgentsManager({
                               {...restField}
                               className="mb-0"
                               name={[name, "departmentId"]}
-                              rules={[{ required: true, message: "Select a department" }]}
+                              rules={[{ required: true, message: t("access.departmentRequired") }]}
                             >
                               <Select
-                                aria-label="Department grant"
+                                aria-label={t("access.departmentAria")}
                                 disabled={!access.canReadDepartments}
                                 options={departmentOptions}
                                 optionFilterProp="label"
-                                placeholder="Department"
+                                placeholder={t("access.departmentPlaceholder")}
                               />
                             </Form.Item>
                             <Form.Item
@@ -1019,13 +1025,13 @@ export function AgentsManager({
                               className="mb-0"
                               name={[name, "includeDescendants"]}
                               valuePropName="checked"
-                              label="Include descendants"
+                              label={t("access.includeDescendants")}
                             >
                               <Switch disabled={!access.canReadDepartments} />
                             </Form.Item>
                             {access.canReadDepartments ? (
                               <Button
-                                aria-label="Remove department grant"
+                                aria-label={t("access.removeDepartmentAria")}
                                 danger
                                 type="text"
                                 icon={<DeleteOutlined />}
@@ -1046,7 +1052,7 @@ export function AgentsManager({
                       loading={savingSection === "access"}
                       onClick={() => void saveInvocationAccess()}
                     >
-                      Save Invocation Grants
+                      {t("access.save")}
                     </Button>
                   </div>
                 ) : null}
@@ -1058,22 +1064,19 @@ export function AgentsManager({
     : [];
 
   return (
-    <main className="agentmix-grid min-h-[calc(100vh-74px)]">
+    <main className="agentmix-grid min-h-[calc(100dvh-3.5rem)]">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <section className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
             <p className="m-0 font-mono text-xs tracking-[0.26em] text-[#b8f500] uppercase">
-              Governed resources / Agents
+              {t("page.eyebrow")}
             </p>
-            <h1 className="mb-0 mt-3 text-4xl font-semibold tracking-[-0.045em]">Agent Management</h1>
-            <p className="mb-0 mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
-              Agent identity, authorization, runtime and invocation grants have independent save boundaries.
-              Execution remains constrained by the current actor and immutable run snapshots.
-            </p>
+            <h1 className="mb-0 mt-3 text-4xl font-semibold tracking-[-0.045em]">{t("page.title")}</h1>
+            <p className="mb-0 mt-3 max-w-2xl text-sm leading-6 text-zinc-500">{t("page.intro")}</p>
           </div>
           {access.canCreate ? (
             <Button data-testid="create-agent" type="primary" size="large" icon={<PlusOutlined />} onClick={openCreate}>
-              Create Agent
+              {t("page.create")}
             </Button>
           ) : null}
         </section>
@@ -1083,41 +1086,41 @@ export function AgentsManager({
             <Input
               data-testid="agent-search"
               allowClear
-              aria-label="Search agents"
+              aria-label={t("filters.searchAria")}
               className="md:max-w-sm"
               prefix={<SearchOutlined />}
-              placeholder="Search by name or slug"
+              placeholder={t("filters.searchPlaceholder")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onPressEnter={() => navigate()}
             />
             <Select
-              aria-label="Filter by status"
+              aria-label={t("filters.statusAria")}
               className="w-full md:w-40"
               value={status}
               options={[
-                { label: "All statuses", value: "" },
-                { label: "Active", value: "active" },
-                { label: "Disabled", value: "disabled" },
+                { label: t("filters.allStatuses"), value: "" },
+                { label: t("status.active"), value: "active" },
+                { label: t("status.disabled"), value: "disabled" },
               ]}
               onChange={setStatus}
             />
             <Button data-testid="apply-agent-filters" icon={<ReloadOutlined />} onClick={() => navigate()}>
-              Apply Filters
+              {t("filters.apply")}
             </Button>
           </div>
           <Table<AgentSummary>
             rowKey="id"
             columns={columns}
             dataSource={initialData.items}
-            locale={{ emptyText: <Empty description="No agents match the current filters" /> }}
+            locale={{ emptyText: <Empty description={t("table.empty")} /> }}
             scroll={{ x: 880 }}
             pagination={{
               current: initialData.page,
               pageSize: initialData.pageSize,
               total: initialData.total,
               showSizeChanger: false,
-              showTotal: (total) => `${total} agents`,
+              showTotal: (total) => t("table.total", { total }),
               onChange: (page) => navigate(page),
             }}
           />
@@ -1128,7 +1131,7 @@ export function AgentsManager({
         destroyOnHidden
         size={760}
         open={drawerOpen}
-        title={mode === "create" ? "Create Governed Agent" : selected?.name ?? "Loading Agent"}
+        title={mode === "create" ? t("drawer.createTitle") : selected?.name ?? t("drawer.loadingTitle")}
         extra={selected ? (
           <Space>
             {selected.isSystem ? <Tag color="geekblue">SYSTEM</Tag> : null}
@@ -1142,7 +1145,7 @@ export function AgentsManager({
         {error ? <Alert className="mb-5" type="error" showIcon title={error} closable onClose={() => setError(null)} /> : null}
         {notice ? <Alert className="mb-5" type="success" showIcon title={notice} closable onClose={() => setNotice(null)} /> : null}
         {loadingDetail ? (
-          <div className="py-20 text-center text-zinc-500">Resolving governance boundaries…</div>
+          <div className="py-20 text-center text-zinc-500">{t("drawer.resolving")}</div>
         ) : mode === "create" ? (
           <Form<ProfileFormValues>
             form={profileForm}
@@ -1154,30 +1157,30 @@ export function AgentsManager({
           >
             <SectionHeading
               icon={<RobotOutlined />}
-              title="Agent identity"
-              detail="Create the governed subject first. Capabilities, runtime and invocation grants are configured after creation."
+              title={t("create.heading")}
+              detail={t("create.headingDetail")}
             />
             <Form.Item
               name="slug"
-              label="Unique slug"
+              label={t("form.slug")}
               rules={[
-                { required: true, message: "Enter an agent slug" },
-                { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: "Use lowercase letters, numbers and hyphens" },
+                { required: true, message: t("form.slugRequired") },
+                { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: t("form.slugPattern") },
                 { min: 3, max: 100 },
               ]}
             >
-              <Input data-testid="agent-slug" placeholder="directory-agent" />
+              <Input data-testid="agent-slug" placeholder={t("form.slugPlaceholder")} />
             </Form.Item>
-            <Form.Item name="name" label="Display name" rules={[{ required: true }, { max: 120 }]}>
-              <Input data-testid="agent-name" placeholder="Directory Agent" />
+            <Form.Item name="name" label={t("form.name")} rules={[{ required: true }, { max: 120 }]}>
+              <Input data-testid="agent-name" placeholder={t("form.namePlaceholder")} />
             </Form.Item>
-            <Form.Item name="description" label="Responsibilities" rules={[{ max: 2000 }]}>
-              <Input.TextArea rows={5} placeholder="Describe this Agent's responsibility boundary. Never include secrets." />
+            <Form.Item name="description" label={t("form.description")} rules={[{ max: 2000 }]}>
+              <Input.TextArea rows={5} placeholder={t("form.descriptionPlaceholder")} />
             </Form.Item>
             <div className="mt-7 flex justify-end gap-3">
-              <Button onClick={closeDrawer}>Cancel</Button>
+              <Button onClick={closeDrawer}>{t("create.cancel")}</Button>
               <Button data-testid="submit-agent" type="primary" htmlType="submit" loading={savingSection === "create"}>
-                Create Agent
+                {t("create.submit")}
               </Button>
             </div>
           </Form>

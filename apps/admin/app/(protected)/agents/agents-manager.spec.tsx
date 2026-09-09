@@ -1,8 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
 import { hydrateRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import agentsMessages from "../../../messages/en/agents.json";
 import { AgentsManager } from "./agents-manager";
 import type { AgentDetail, AgentListResponse, AgentManagerAccess, AgentRuntime } from "./types";
 
@@ -122,11 +124,23 @@ function managerElement(
   );
 }
 
+function withIntl(ui: React.ReactElement) {
+  return (
+    <NextIntlClientProvider locale="en" messages={{ agents: agentsMessages }}>
+      {ui}
+    </NextIntlClientProvider>
+  );
+}
+
+function renderWithIntl(ui: React.ReactElement) {
+  return render(withIntl(ui));
+}
+
 function renderManager(
   access: AgentManagerAccess = fullAccess,
   options: Parameters<typeof managerElement>[1] = {},
 ) {
-  return render(managerElement(access, options));
+  return renderWithIntl(managerElement(access, options));
 }
 
 function mockDetailRequests() {
@@ -152,7 +166,7 @@ describe("AgentsManager", () => {
   });
 
   it("keeps a closed Drawer out of SSR markup and hydrates without recovery", async () => {
-    const element = managerElement();
+    const element = withIntl(managerElement());
     const markup = renderToString(element);
     expect(markup).not.toContain("ant-drawer");
 

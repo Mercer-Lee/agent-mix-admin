@@ -1,0 +1,68 @@
+{
+  "page": {
+    "eyebrow": "证据面 / 审计",
+    "title": "审计控制台",
+    "intro": "系统事件不包含任何内容数据。会话元数据与 Message 正文通过显式权限分离。"
+  },
+  "tabs": {
+    "events": "系统事件",
+    "conversations": "会话审计"
+  },
+  "events": {
+    "total": "{total, plural, other {# 条不可篡改的审计事件}}",
+    "paginationTotal": "{total, plural, other {# 条事件}}",
+    "empty": "暂无审计事件",
+    "system": "系统",
+    "columns": {
+      "time": "时间",
+      "action": "操作",
+      "actor": "操作者",
+      "resource": "资源",
+      "outcome": "结果",
+      "metadata": "元数据"
+    }
+  },
+  "conversations": {
+    "total": "{total, plural, other {# 条留存的会话记录}}",
+    "paginationTotal": "{total, plural, other {# 条会话}}",
+    "empty": "暂无会话审计记录",
+    "recordName": "会话记录",
+    "usageTokens": "{total} tokens",
+    "contentPermission": "内容权限：{value}",
+    "contentGranted": "已授权",
+    "contentMetadataOnly": "仅元数据",
+    "columns": {
+      "conversation": "会话",
+      "actor": "操作者",
+      "agentModel": "Agent / 模型",
+      "status": "状态",
+      "usage": "用量",
+      "updated": "更新时间",
+      "inspect": "查看"
+    }
+  },
+  "drawer": {
+    "title": "会话审计记录",
+    "loading": "正在加载留存的审计元数据…",
+    "contentHeading": "会话内容",
+    "emptyContent": "暂无留存的消息内容",
+    "fields": {
+      "conversationId": "会话 ID",
+      "actor": "操作者",
+      "agent": "Agent",
+      "model": "模型",
+      "status": "状态",
+      "usage": "用量",
+      "created": "创建时间",
+      "deleted": "删除时间",
+      "deletedNo": "否"
+    },
+    "protected": {
+      "title": "Message 正文受权限保护",
+      "description": "需要 conversations:read-content 权限。本页面未请求内容接口。"
+    }
+  },
+  "errors": {
+    "loadConversation": "无法加载所选的会话审计记录。"
+  }
+}

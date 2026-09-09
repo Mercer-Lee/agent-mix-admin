@@ -1,8 +1,10 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModelsManager } from "./models-manager";
 import type { ModelProfile } from "./types";
+import modelsMessages from "../../../messages/en/models.json";
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -17,6 +19,14 @@ vi.mock("./actions", () => ({
   updateModelAction: mocks.update,
   checkModelAction: mocks.check,
 }));
+
+function renderWithIntl(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={{ models: modelsMessages }}>
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
 
 const model: ModelProfile = {
   id: "019d2f5b-a8ab-7000-8000-000000000010",
@@ -38,7 +48,7 @@ describe("ModelsManager", () => {
 
   it("never renders credential or base URL form controls", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <ModelsManager
         initialData={{ items: [model] }}
         access={{ canCreate: true, canUpdate: true, canTest: true }}
@@ -54,7 +64,7 @@ describe("ModelsManager", () => {
   it("submits only public profile fields", async () => {
     mocks.create.mockResolvedValue({ ok: true, data: { ...model, id: "new-model", key: "reasoning" } });
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <ModelsManager
         initialData={{ items: [model] }}
         access={{ canCreate: true, canUpdate: true, canTest: true }}
@@ -92,7 +102,7 @@ describe("ModelsManager", () => {
       },
     });
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <ModelsManager
         initialData={{ items: [model] }}
         access={{ canCreate: true, canUpdate: true, canTest: true }}
@@ -117,7 +127,7 @@ describe("ModelsManager", () => {
       data: { ...model, name: "Updated Default", lastCheck: null },
     });
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <ModelsManager
         initialData={{ items: [{ ...model, lastCheck }] }}
         access={{ canCreate: true, canUpdate: true, canTest: true }}

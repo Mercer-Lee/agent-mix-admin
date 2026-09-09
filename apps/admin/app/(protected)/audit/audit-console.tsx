@@ -2,8 +2,9 @@
 
 import { EyeOutlined, FileSearchOutlined, LockOutlined, MessageOutlined, SafetyOutlined } from "@ant-design/icons";
 import { Alert, Button, Descriptions, Drawer, Empty, Table, Tabs, Tag, Typography, type TableProps } from "antd";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SafeMarkdown } from "../chat/safe-markdown";
 import type { ConversationMessage } from "../chat/types";
 import { normalizeConversationAuditDetail, type ConversationAuditApiDetail } from "./normalize";
@@ -21,16 +22,6 @@ interface AuditConsoleProps {
   canReadContent: boolean;
 }
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  timeZone: "UTC",
-});
-
 const SENSITIVE_KEY = /(prompt|response|content|system.?prompt|tool.?result|headers?|authorization|credential|secret|api.?key)/i;
 
 function sanitizedMetadata(value: unknown): unknown {
@@ -43,13 +34,7 @@ function sanitizedMetadata(value: unknown): unknown {
   );
 }
 
-function usageLabel(usage: ConversationAuditSummary["usage"]) {
-  if (!usage) return "—";
-  const total = usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
-  return total ? `${total.toLocaleString()} tokens` : "—";
-}
-
-function AuditMessage({ message }: { message: ConversationMessage }) {
+function AuditMessage({ message, dateFormatter }: { message: ConversationMessage; dateFormatter: Intl.DateTimeFormat }) {
   return (
     <article className="border border-white/10 bg-black/20 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -66,7 +51,22 @@ function AuditMessage({ message }: { message: ConversationMessage }) {
 }
 
 export function AuditConsole({ events, conversations, canReadContent }: AuditConsoleProps) {
+  const t = useTranslations("audit");
+  const locale = useLocale();
   const router = useRouter();
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZone: "UTC",
+      }),
+    [locale],
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<ConversationAuditDetail | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
@@ -112,6 +112,12 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
     detailControllerRef.current?.abort();
   }, []);
 
+  function usageLabel(usage: ConversationAuditSummary["usage"]) {
+    if (!usage) return "—";
+    const total = usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+    return total ? t("conversations.usageTokens", { total: total.toLocaleString(locale) }) : "—";
+  }
+
   function navigatePage(kind: "events" | "conversations", page: number) {
     const params = new URLSearchParams();
     const eventsPage = kind === "events" ? page : events?.page ?? 1;
@@ -156,7 +162,7 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
       setSelected(normalizeConversationAuditDetail(rawDetail));
     } catch {
       if (!isCurrentDetailRequest(generation, conversationId)) return;
-      setError("Unable to load the selected conversation audit record.");
+      setError(t("errors.loadConversation"));
     } finally {
       if (isCurrentDetailRequest(generation, conversationId)) setLoadingDetail(false);
     }
@@ -164,28 +170,28 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
 
   const eventColumns: TableProps<AuditEvent>["columns"] = [
     {
-      title: "Time",
+      title: t("events.columns.time"),
       dataIndex: "createdAt",
       width: 190,
       render: (value: string) => <span className="font-mono text-xs text-zinc-500">{dateFormatter.format(new Date(value))}</span>,
     },
     {
-      title: "Action",
+      title: t("events.columns.action"),
       dataIndex: "action",
       render: (value: string) => <span className="font-mono text-xs text-zinc-200">{value}</span>,
     },
     {
-      title: "Actor",
+      title: t("events.columns.actor"),
       key: "actor",
       render: (_, event) => (
           <div>
-          <div className="text-sm text-zinc-300">{event.actor?.displayName ?? event.actor?.username ?? event.actorSubjectId ?? "System"}</div>
+          <div className="text-sm text-zinc-300">{event.actor?.displayName ?? event.actor?.username ?? event.actorSubjectId ?? t("events.system")}</div>
           <div className="font-mono text-[10px] text-zinc-700">{event.actor?.id ?? event.actorSubjectId ?? "—"}</div>
         </div>
       ),
     },
     {
-      title: "Resource",
+      title: t("events.columns.resource"),
       key: "resource",
       render: (_, event) => (
         <div>
@@ -195,13 +201,13 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
       ),
     },
     {
-      title: "Outcome",
+      title: t("events.columns.outcome"),
       dataIndex: "outcome",
       width: 110,
       render: (value: string) => <Tag color={value === "success" ? "lime" : "error"}>{value.toUpperCase()}</Tag>,
     },
     {
-      title: "Metadata",
+      title: t("events.columns.metadata"),
       dataIndex: "metadata",
       width: 230,
       render: (value: Record<string, unknown> | null) => (
@@ -214,22 +220,22 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
 
   const conversationColumns: TableProps<ConversationAuditSummary>["columns"] = [
     {
-      title: "Conversation",
+      title: t("conversations.columns.conversation"),
       key: "conversation",
       render: (_, item) => (
         <div className="min-w-44">
-          <div className="text-sm font-medium text-zinc-200">Conversation record</div>
+          <div className="text-sm font-medium text-zinc-200">{t("conversations.recordName")}</div>
           <div className="mt-1 font-mono text-[10px] text-zinc-700">{item.id}</div>
         </div>
       ),
     },
     {
-      title: "Actor",
+      title: t("conversations.columns.actor"),
       key: "actor",
       render: (_, item) => item.actor?.displayName ?? item.actor?.username ?? item.actorSubjectId ?? "—",
     },
     {
-      title: "Agent / Model",
+      title: t("conversations.columns.agentModel"),
       key: "runtime",
       render: (_, item) => {
         const model = item.model ?? item.modelProfile;
@@ -242,19 +248,19 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
       },
     },
     {
-      title: "Status",
+      title: t("conversations.columns.status"),
       dataIndex: "status",
       width: 115,
       render: (value: string) => <Tag color={value === "completed" || value === "active" ? "lime" : value === "failed" ? "error" : "default"}>{value.toUpperCase()}</Tag>,
     },
     {
-      title: "Usage",
+      title: t("conversations.columns.usage"),
       dataIndex: "usage",
       width: 130,
       render: (value: ConversationAuditSummary["usage"]) => <span className="font-mono text-xs text-zinc-500">{usageLabel(value)}</span>,
     },
     {
-      title: "Updated",
+      title: t("conversations.columns.updated"),
       dataIndex: "updatedAt",
       width: 180,
       render: (value: string) => <span className="font-mono text-xs text-zinc-500">{dateFormatter.format(new Date(value))}</span>,
@@ -263,17 +269,17 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
       title: "",
       key: "action",
       width: 90,
-      render: (_, item) => <Button data-testid={`audit-conversation-${item.id}`} type="text" icon={<EyeOutlined />} onClick={() => void openConversation(item)}>Inspect</Button>,
+      render: (_, item) => <Button data-testid={`audit-conversation-${item.id}`} type="text" icon={<EyeOutlined />} onClick={() => void openConversation(item)}>{t("conversations.columns.inspect")}</Button>,
     },
   ];
 
   const tabs = [
     events ? {
       key: "events",
-      label: <span><SafetyOutlined /> System events</span>,
+      label: <span><SafetyOutlined /> {t("tabs.events")}</span>,
       children: (
         <section data-testid="audit-events-section" className="border border-white/10 bg-[#0d1011]/95">
-          <div className="border-b border-white/10 p-4 font-mono text-xs text-zinc-600">{events.total} immutable audit events</div>
+          <div className="border-b border-white/10 p-4 font-mono text-xs text-zinc-600">{t("events.total", { total: events.total })}</div>
           <Table<AuditEvent>
             rowKey="id"
             columns={eventColumns}
@@ -284,22 +290,22 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
               pageSize: events.pageSize,
               total: events.total,
               showSizeChanger: false,
-              showTotal: (total) => `${total} events`,
+              showTotal: (total) => t("events.paginationTotal", { total }),
               onChange: (page) => navigatePage("events", page),
             }}
-            locale={{ emptyText: <Empty description="No audit events" /> }}
+            locale={{ emptyText: <Empty description={t("events.empty")} /> }}
           />
         </section>
       ),
     } : null,
     conversations ? {
       key: "conversations",
-      label: <span><MessageOutlined /> Conversation audit</span>,
+      label: <span><MessageOutlined /> {t("tabs.conversations")}</span>,
       children: (
         <section data-testid="audit-conversations-section" className="border border-white/10 bg-[#0d1011]/95">
           <div className="flex flex-col justify-between gap-2 border-b border-white/10 p-4 sm:flex-row sm:items-center">
-            <span className="font-mono text-xs text-zinc-600">{conversations.total} retained conversation records</span>
-            <span className="flex items-center gap-2 text-xs text-zinc-500"><LockOutlined /> Content permission: {canReadContent ? "granted" : "metadata only"}</span>
+            <span className="font-mono text-xs text-zinc-600">{t("conversations.total", { total: conversations.total })}</span>
+            <span className="flex items-center gap-2 text-xs text-zinc-500"><LockOutlined /> {t("conversations.contentPermission", { value: canReadContent ? t("conversations.contentGranted") : t("conversations.contentMetadataOnly") })}</span>
           </div>
           <Table<ConversationAuditSummary>
             rowKey="id"
@@ -311,10 +317,10 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
               pageSize: conversations.pageSize,
               total: conversations.total,
               showSizeChanger: false,
-              showTotal: (total) => `${total} conversations`,
+              showTotal: (total) => t("conversations.paginationTotal", { total }),
               onChange: (page) => navigatePage("conversations", page),
             }}
-            locale={{ emptyText: <Empty description="No conversation audits" /> }}
+            locale={{ emptyText: <Empty description={t("conversations.empty")} /> }}
           />
         </section>
       ),
@@ -322,46 +328,46 @@ export function AuditConsole({ events, conversations, canReadContent }: AuditCon
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   return (
-    <main className="agentmix-grid min-h-[calc(100vh-74px)]">
+    <main className="agentmix-grid min-h-[calc(100dvh-3.5rem)]">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <section className="mb-8">
-          <p className="m-0 font-mono text-xs tracking-[0.26em] text-[#b8f500] uppercase">Evidence plane / Audit</p>
-          <h1 className="mb-0 mt-3 text-4xl font-semibold tracking-[-0.045em]">Audit Console</h1>
+          <p className="m-0 font-mono text-xs tracking-[0.26em] text-[#b8f500] uppercase">{t("page.eyebrow")}</p>
+          <h1 className="mb-0 mt-3 text-4xl font-semibold tracking-[-0.045em]">{t("page.title")}</h1>
           <p className="mb-0 mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
-            System events remain content-free. Conversation metadata and message bodies are separated by explicit permissions.
+            {t("page.intro")}
           </p>
         </section>
         <Tabs items={tabs} />
       </div>
 
-      <Drawer size={720} open={drawerOpen} title="Conversation Audit Record" onClose={closeDrawer}>
+      <Drawer size={720} open={drawerOpen} title={t("drawer.title")} onClose={closeDrawer}>
         {error ? <Alert className="mb-5" type="error" showIcon title={error} /> : null}
-        {loadingDetail ? <div className="py-20 text-center text-zinc-500">Loading retained audit metadata…</div> : selected ? (
+        {loadingDetail ? <div className="py-20 text-center text-zinc-500">{t("drawer.loading")}</div> : selected ? (
           <>
             <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="Conversation ID" span={2}><Typography.Text copyable className="font-mono text-xs">{selected.id}</Typography.Text></Descriptions.Item>
-              <Descriptions.Item label="Actor">{selected.actor?.displayName ?? selected.actor?.username ?? selected.actorSubjectId ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="Agent">{selected.agent?.name ?? selected.agentId ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="Model" span={2}>{selected.model?.modelId ?? selected.model?.key ?? selected.modelProfile?.modelId ?? selected.modelProfile?.key ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="Status">{selected.status}</Descriptions.Item>
-              <Descriptions.Item label="Usage">{usageLabel(selected.usage)}</Descriptions.Item>
-              <Descriptions.Item label="Created">{dateFormatter.format(new Date(selected.createdAt))}</Descriptions.Item>
-              <Descriptions.Item label="Deleted">{selected.deletedAt ? dateFormatter.format(new Date(selected.deletedAt)) : "No"}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.conversationId")} span={2}><Typography.Text copyable className="font-mono text-xs">{selected.id}</Typography.Text></Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.actor")}>{selected.actor?.displayName ?? selected.actor?.username ?? selected.actorSubjectId ?? "—"}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.agent")}>{selected.agent?.name ?? selected.agentId ?? "—"}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.model")} span={2}>{selected.model?.modelId ?? selected.model?.key ?? selected.modelProfile?.modelId ?? selected.modelProfile?.key ?? "—"}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.status")}>{selected.status}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.usage")}>{usageLabel(selected.usage)}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.created")}>{dateFormatter.format(new Date(selected.createdAt))}</Descriptions.Item>
+              <Descriptions.Item label={t("drawer.fields.deleted")}>{selected.deletedAt ? dateFormatter.format(new Date(selected.deletedAt)) : t("drawer.fields.deletedNo")}</Descriptions.Item>
             </Descriptions>
 
             <div className="mb-4 mt-8 flex items-center gap-2">
               <FileSearchOutlined className="text-[#b8f500]" />
-              <h2 className="m-0 text-base font-medium">Conversation content</h2>
+              <h2 className="m-0 text-base font-medium">{t("drawer.contentHeading")}</h2>
             </div>
             {canReadContent ? (
-              messages.length ? <div className="space-y-3">{messages.map((message) => <AuditMessage key={message.id} message={message} />)}</div> : <Empty description="No retained message content" />
+              messages.length ? <div className="space-y-3">{messages.map((message) => <AuditMessage key={message.id} message={message} dateFormatter={dateFormatter} />)}</div> : <Empty description={t("drawer.emptyContent")} />
             ) : (
               <Alert
                 type="warning"
                 showIcon
                 icon={<LockOutlined />}
-                title="Message bodies are protected"
-                description="conversations:read-content is required. This page did not request the content endpoint."
+                title={t("drawer.protected.title")}
+                description={t("drawer.protected.description")}
               />
             )}
           </>

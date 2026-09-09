@@ -1,0 +1,159 @@
+{
+  "page": {
+    "eyebrow": "Governed resources / Agents",
+    "title": "Agent Management",
+    "intro": "Agent identity, authorization, runtime and invocation grants have independent save boundaries. Execution remains constrained by the current actor and immutable run snapshots.",
+    "create": "Create Agent"
+  },
+  "filters": {
+    "searchAria": "Search agents",
+    "searchPlaceholder": "Search by name or slug",
+    "statusAria": "Filter by status",
+    "allStatuses": "All statuses",
+    "apply": "Apply Filters"
+  },
+  "table": {
+    "agent": "Agent",
+    "status": "Status",
+    "description": "Description",
+    "updated": "Updated",
+    "manage": "Manage",
+    "view": "View",
+    "empty": "No agents match the current filters",
+    "total": "{total, plural, =1 {1 agent} other {# agents}}"
+  },
+  "status": {
+    "active": "Active",
+    "disabled": "Disabled",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "drawer": {
+    "createTitle": "Create Governed Agent",
+    "loadingTitle": "Loading Agent",
+    "resolving": "Resolving governance boundaries…"
+  },
+  "create": {
+    "heading": "Agent identity",
+    "headingDetail": "Create the governed subject first. Capabilities, runtime and invocation grants are configured after creation.",
+    "cancel": "Cancel",
+    "submit": "Create Agent"
+  },
+  "form": {
+    "slug": "Unique slug",
+    "slugRequired": "Enter an agent slug",
+    "slugPattern": "Use lowercase letters, numbers and hyphens",
+    "slugPlaceholder": "directory-agent",
+    "name": "Display name",
+    "namePlaceholder": "Directory Agent",
+    "description": "Responsibilities",
+    "descriptionPlaceholder": "Describe this Agent's responsibility boundary. Never include secrets.",
+    "lifecycleStatus": "Lifecycle status"
+  },
+  "tabs": {
+    "profile": "Profile",
+    "capabilities": "Capabilities",
+    "runtime": "Runtime",
+    "access": "Who can invoke"
+  },
+  "profile": {
+    "heading": "Profile",
+    "headingDetail": "Identity metadata and lifecycle state are saved without touching capabilities, runtime or grants.",
+    "subjectId": "Subject ID",
+    "systemResource": "System resource",
+    "created": "Created",
+    "save": "Save Profile"
+  },
+  "capabilities": {
+    "heading": "Capabilities",
+    "headingDetail": "The runtime only exposes a capability when both the actor and this Agent currently hold its required permissions.",
+    "boundaryTitle": "ACTOR ∩ AGENT",
+    "boundaryDetail": "Inherited roles and direct permissions are separate authorization boundaries and save independently.",
+    "inheritedRoles": "Inherited roles",
+    "inheritedRolesPlaceholder": "Select roles inherited by this Agent",
+    "saveInheritedRoles": "Save Inherited Roles",
+    "directPermissions": "Direct permissions",
+    "directPermissionsPlaceholder": "Select least-privilege direct permissions",
+    "saveDirectPermissions": "Save Direct Permissions",
+    "surfaceUnavailableTitle": "Latest capability surface unavailable",
+    "surfaceUnavailableDetail": "The authorization update was saved, but this Drawer will not display the previous effective permissions as if they were current. Close and reopen it to retry.",
+    "effectiveSurface": "Effective capability surface",
+    "effectiveCount": "{count, plural, other {# effective permissions}}",
+    "noCapabilities": "No capabilities are currently exposed."
+  },
+  "runtime": {
+    "heading": "Runtime",
+    "headingDetail": "A run captures an immutable snapshot of these settings before it is placed on the BullMQ runtime queue.",
+    "notConfiguredTitle": "Runtime configuration is not available",
+    "notConfiguredDetail": "The Agent cannot be invoked until a model profile and system prompt are configured.",
+    "modelProfile": "Model profile",
+    "modelProfileRequired": "Select an active model profile",
+    "modelProfilePlaceholder": "Select a governed profile",
+    "modelDisabledSuffix": "(disabled)",
+    "systemPrompt": "System prompt",
+    "systemPromptPlaceholder": "Define responsibility, safety and response boundaries.",
+    "maxOutputTokens": "Maximum output tokens",
+    "envNote": "Provider connection, API key and base URL are Worker environment settings and are never returned to this page.",
+    "save": "Save Runtime"
+  },
+  "access": {
+    "heading": "Who can invoke",
+    "headingDetail": "User, role and department grants are positive OR rules. Every caller must also hold agents:invoke; no role bypasses explicit grants.",
+    "noGrantsTitle": "No grants means no access",
+    "noGrantsDetail": "Even super-admin requires an explicit user, role or department grant for this Agent.",
+    "userDirRequiredTitle": "User directory permission is required to change named-user grants",
+    "userDirRequiredDetail": "Existing named-user grants remain attached and will be preserved when role or department grants are saved.",
+    "roleDirRequiredTitle": "Role directory permission is required to change role grants",
+    "roleDirRequiredDetail": "Existing role grants remain attached and will be preserved when other invocation grants are saved.",
+    "departmentDirRequiredTitle": "Department directory permission is required to change department grants",
+    "departmentDirRequiredDetail": "Existing department grants and descendant scope remain attached and will be preserved when other invocation grants are saved.",
+    "userSearchUnavailable": "User directory search is temporarily unavailable. Existing grants are preserved.",
+    "users": "Users",
+    "userCandidatesAria": "User grant candidates",
+    "userSearchPlaceholder": "Search the user directory",
+    "userDirectoryRequiredPlaceholder": "User directory access required",
+    "roles": "Roles",
+    "roleCandidatesAria": "Role grant candidates",
+    "rolePlaceholder": "Grant role holders",
+    "departments": "Departments",
+    "addDepartment": "Add Department",
+    "departmentRequired": "Select a department",
+    "departmentAria": "Department grant",
+    "departmentPlaceholder": "Department",
+    "includeDescendants": "Include descendants",
+    "removeDepartmentAria": "Remove department grant",
+    "save": "Save Invocation Grants"
+  },
+  "errors": {
+    "permissionChanged": "Your permissions changed before this Agent could be loaded. Refresh the page to update the available governance sections.",
+    "notFound": "This Agent no longer exists or is no longer available.",
+    "loadFailed": "Unable to load the complete agent governance record. Refresh the page and try again.",
+    "createFailed": "Unable to create the agent.",
+    "profileFailed": "Unable to save the agent profile.",
+    "rolesFailed": "Unable to save inherited roles.",
+    "rolesSurfaceFailed": "Inherited roles were saved, but the latest capability surface could not be loaded.",
+    "permissionsFailed": "Unable to save direct permissions.",
+    "permissionsSurfaceFailed": "Direct permissions were saved, but the latest capability surface could not be loaded.",
+    "runtimeFailed": "Unable to save the Agent runtime.",
+    "accessFailed": "Unable to save Agent invocation access."
+  },
+  "notices": {
+    "profileSaved": "Profile boundary saved independently.",
+    "rolesSaved": "Inherited roles saved. Direct permissions were not changed.",
+    "permissionsSaved": "Direct permissions saved. Role assignments were not changed.",
+    "runtimeSaved": "Runtime snapshot settings saved independently.",
+    "accessSaved": "Invocation grants saved. Invoke permission is still required for every actor."
+  },
+  "actions": {
+    "forbidden": "Your account cannot update {resource}.",
+    "invalidRequest": "Invalid request: {message}",
+    "serviceUnavailable": "The {resource} service is temporarily unavailable.",
+    "resources": {
+      "agentProfile": "agent profile",
+      "agentRoles": "agent role assignments",
+      "agentPermissions": "agent direct permissions",
+      "agentRuntime": "agent runtime",
+      "agentAccess": "agent invocation access"
+    }
+  }
+}

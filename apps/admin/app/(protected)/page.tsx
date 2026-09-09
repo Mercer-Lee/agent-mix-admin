@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { getAuthContext } from "../_lib/auth";
 import { StatusCard, type HealthStatus } from "./_components/status-card";
 
@@ -30,7 +31,11 @@ async function getHealth(): Promise<HealthResponse | null> {
 }
 
 export default async function HomePage() {
-  const [auth, health] = await Promise.all([getAuthContext(), getHealth()]);
+  const [auth, health, t] = await Promise.all([
+    getAuthContext(),
+    getHealth(),
+    getTranslations("overview"),
+  ]);
   const workerCount = health?.worker?.count;
   const workerStatus: HealthStatus =
     !health?.worker || health.worker.status === "unknown" || workerCount === null || workerCount === undefined
@@ -45,44 +50,41 @@ export default async function HomePage() {
     <main className="mx-auto max-w-6xl px-6 py-12">
       <div className="grid gap-8 lg:grid-cols-[1fr_19rem]">
         <section>
-          <p className="font-mono text-xs tracking-[0.28em] text-[#b8f500] uppercase">Control plane / live status</p>
+          <p className="font-mono text-xs tracking-[0.28em] text-[#b8f500] uppercase">{t("eyebrow")}</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-            Govern agents like every other critical enterprise resource.
+            {t("headline")}
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400">
-            The control plane defines identity, authorization, runtime and audit boundaries. Health signals below
-            are read from the live server rather than assumed from configuration.
-          </p>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400">{t("intro")}</p>
 
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatusCard
-              title="database / PostgreSQL"
+              title={t("postgresTitle")}
               status={health ? dependencyStatus(health.database) : "unknown"}
-              detail={health ? "Control-plane persistence" : "Health endpoint unavailable"}
+              detail={health ? t("postgresDetail") : t("healthUnavailable")}
             />
             <StatusCard
-              title="event bus / Redis"
+              title={t("redisTitle")}
               status={health ? dependencyStatus(health.redis) : "unknown"}
-              detail="Run tasks, events and cancellation"
+              detail={t("redisDetail")}
             />
             <StatusCard
-              title="agent runtime"
+              title={t("runtimeTitle")}
               status={workerStatus}
               detail={
                 typeof workerCount === "number"
-                  ? `${workerCount} worker${workerCount === 1 ? "" : "s"} registered`
-                  : "Worker presence cannot be determined"
+                  ? t("workerCount", { count: workerCount })
+                  : t("workerUnknown")
               }
             />
           </div>
         </section>
 
         <aside className="border border-white/10 bg-white/[0.025] p-5">
-          <p className="font-mono text-[11px] tracking-[0.22em] text-zinc-600 uppercase">Active subject</p>
+          <p className="font-mono text-[11px] tracking-[0.22em] text-zinc-600 uppercase">{t("activeSubject")}</p>
           <p className="mt-4 text-lg font-medium">{auth?.user.displayName}</p>
           <p className="font-mono text-xs text-zinc-500">{auth?.user.id}</p>
           <div className="my-5 h-px bg-white/10" />
-          <p className="text-xs text-zinc-500">Roles</p>
+          <p className="text-xs text-zinc-500">{t("roles")}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {auth?.roles.map((role) => (
               <span key={role.id} className="border border-[#b8f500]/30 px-2 py-1 font-mono text-xs text-[#caff24]">
@@ -91,7 +93,7 @@ export default async function HomePage() {
             ))}
           </div>
           <p className="mt-5 font-mono text-xs text-zinc-600">
-            {auth?.permissions.length ?? 0} effective permissions
+            {t("effectivePermissions", { count: auth?.permissions.length ?? 0 })}
           </p>
         </aside>
       </div>
