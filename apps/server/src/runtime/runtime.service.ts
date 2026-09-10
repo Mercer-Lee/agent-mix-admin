@@ -13,7 +13,6 @@ import {
   CapabilityResultV1Schema,
   RuntimeEventV1Schema,
   RuntimeOutboxMessageV1Schema,
-  UsersSearchOutputV1Schema,
   type AgentRunEventV1,
   type AgentRunControlV1,
   type AgentRunTaskV1,
@@ -857,13 +856,18 @@ export class RuntimeService implements OnApplicationBootstrap, OnApplicationShut
       });
     }
     try {
-      const output = UsersSearchOutputV1Schema.parse(
-        await this.capabilities.execute(request.capability, request.input, {
+      // The CapabilityExecutor has already validated input and output against
+      // the capability's registered schemas; the RPC boundary only enforces
+      // JSON shape so MCP tools with dynamic schemas flow through unchanged.
+      const output = await this.capabilities.execute(
+        request.capability,
+        request.input,
+        {
           actorSubjectId: request.actorSubjectId,
           agentSubjectId: request.agentSubjectId,
           traceId: request.traceId,
           conversationId: request.conversationId,
-        }),
+        },
       );
       return CapabilityResultV1Schema.parse({
         version: 1,

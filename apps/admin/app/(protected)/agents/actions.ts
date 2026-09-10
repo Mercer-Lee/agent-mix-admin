@@ -18,7 +18,13 @@ export interface AgentActionResult<T = AgentDetail> {
   error?: string;
 }
 
-type AgentActionResource = "agentProfile" | "agentRoles" | "agentPermissions" | "agentRuntime" | "agentAccess";
+type AgentActionResource =
+  | "agentProfile"
+  | "agentRoles"
+  | "agentPermissions"
+  | "agentRuntime"
+  | "agentAccess"
+  | "agentTools";
 
 async function actionError(error: unknown, resource: AgentActionResource): Promise<AgentActionResult<never>> {
   const t = await getTranslations("agents.actions");
@@ -133,5 +139,21 @@ export async function updateAgentAccessAction(
     return { ok: true, data: access };
   } catch (error) {
     return await actionError(error, "agentAccess");
+  }
+}
+
+export async function replaceAgentToolsAction(
+  agentId: string,
+  toolIds: string[],
+): Promise<AgentActionResult<void>> {
+  try {
+    await serverApi<void>(`/agents/${agentId}/tools`, {
+      method: "PUT",
+      body: JSON.stringify({ toolIds }),
+    });
+    revalidatePath("/agents");
+    return { ok: true };
+  } catch (error) {
+    return await actionError(error, "agentTools");
   }
 }

@@ -8,6 +8,7 @@ import {
   AgentRunEventV1Schema,
   AgentRunTaskV1Schema,
   CapabilityRequestV1Schema,
+  deriveProviderToolName,
   ModelCheckTaskV1Schema,
   RuntimeOutboxMessageV1Schema,
   RuntimeTaskV1Schema,
@@ -25,6 +26,17 @@ const ids = {
   event: "77777777-7777-4777-8777-777777777777",
   request: "88888888-8888-4888-8888-888888888888",
 };
+
+/**
+ * Top-level fields an issue points at, so a rejection stays diagnosable.
+ * Zod reports unrecognized object keys in the message rather than the path.
+ */
+function issuePaths(result: { success: boolean; error?: { issues: Array<{ path: PropertyKey[]; message: string }> } }) {
+  return (result.error?.issues ?? []).map((issue) => {
+    if (issue.path.length) return String(issue.path[0]);
+    return /Unrecognized key: "([^"]+)"/.exec(issue.message)?.[1] ?? "undefined";
+  });
+}
 
 function validRunTask() {
   return {
@@ -188,5 +200,135 @@ describe("Phase 1C Runtime contracts", () => {
 
     expect(RuntimeOutboxMessageV1Schema.parse(control)).toEqual(control);
     expect(RuntimeTaskV1Schema.safeParse(control).success).toBe(false);
+  });
+});
+
+describe("Phase 2A MCP tool contracts", () => {
+  it("carries model-facing tool descriptors in the run snapshot while staying backward compatible", () => {
+    const withTools = {
+      ...validRunTask(),
+      capabilities: ["users.search", "mcp-docs.search_docs"],
+      tools: [
+        {
+          id: "users.search",
+          name: "users_search",
+          description: "Search governed users.",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        },
+        {
+          id: "mcp-docs.search_docs",
+          name: "search_docs",
+          description: "Search the handbook.",
+          inputSchema: {
+            type: "object",
+            properties: { query: { type: "string" } },
+            required: ["query"],
+            additionalProperties: false,
+          },
+        },
+      ],
+    };
+    expect(AgentRunTaskV1Schema.parse(withTools).tools).toHaveLength(2);
+    // Pre-2A snapshots without descriptors keep parsing.
+    expect(AgentRunTaskV1Schema.safeParse(validRunTask()).success).toBe(true);
+    // Provider tool names must stay provider-safe.
+    expect(
+      AgentRunTaskV1Schema.safeParse({
+        ...withTools,
+        tools: [{ ...withTools.tools[0], name: "invalid name!" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("derives provider-safe, unique tool names for capability ids", () => {
+    // A capability id always carries the module separator, which providers
+    // reject, so even a short id is rewritten into a clean function name.
+    const shortId = deriveProviderToolName("mcp-docs.search");
+    expect(shortId).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+    expect(shortId).toContain("search");
+    // A long id keeps the readable action and stays inside the 64-char limit.
+    const longId = `mcp-${"a".repeat(60)}.get_workspace_info`;
+    const derived = deriveProviderToolName(longId);
+    expect(derived).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+    expect(derived).toContain("get_workspace_info");
+    expect(derived.length).toBeLessThanOrEqual(64);
+    // The real collision case: two servers expose a tool with the SAME remote
+    // name, so only the derived digest keeps them apart.
+    expect(deriveProviderToolName("mcp-docs.search")).not.toBe(
+      deriveProviderToolName("mcp-github.search"),
+    );
+    expect(deriveProviderToolName("mcp-docs.search")).toContain("search");
+    // Same for long names where the action segment is truncated.
+    const other = deriveProviderToolName(`mcp-${"b".repeat(60)}.get_workspace_info`);
+    expect(other).not.toBe(derived);
+    expect(deriveProviderToolName(`mcp-docs.${"a".repeat(60)}`)).not.toBe(
+      deriveProviderToolName(`mcp-github.${"a".repeat(60)}`),
+    );
+    // Derivation is stable across calls and processes.
+    expect(deriveProviderToolName(longId)).toBe(derived);
+    // Every id the contract's own pattern admits yields a provider-safe name.
+    for (const id of [
+      "users.search",
+      "mcp-integration-mcp.get_workspace_info",
+      `mcp-${"z".repeat(63)}.${"t".repeat(64)}`,
+    ]) {
+      expect(deriveProviderToolName(id)).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+    }
+  });
+
+  it("accepts pattern-based capability ids and keeps users.search requests strictly typed", () => {
+    const base = {
+      version: 1,
+      kind: "capability.request",
+      requestId: ids.request,
+      runId: ids.run,
+      conversationId: ids.conversation,
+      actorSubjectId: ids.actor,
+      agentSubjectId: ids.agent,
+      traceId: "trace-1",
+      requestedAt: "2026-08-29T10:00:01.000Z",
+      deadlineAt: "2026-08-29T10:02:00.000Z",
+    };
+    expect(
+      CapabilityRequestV1Schema.safeParse({
+        ...base,
+        capability: "mcp-docs.search_docs",
+        input: { query: "handbook" },
+      }).success,
+    ).toBe(true);
+    expect(
+      CapabilityRequestV1Schema.safeParse({
+        ...base,
+        capability: "mcp-docs.search_docs",
+        input: { nested: { deep: [1, "two", null] } },
+      }).success,
+    ).toBe(true);
+    // An ill-typed users.search input must not fall through as generic JSON,
+    // and the rejection must still point at the input rather than collapsing
+    // into an opaque union error on `capability`.
+    const illTypedUsersSearch = CapabilityRequestV1Schema.safeParse({
+      ...base,
+      capability: "users.search",
+      input: { page: "not-a-number" },
+    });
+    expect(illTypedUsersSearch.success).toBe(false);
+    expect(issuePaths(illTypedUsersSearch)).toContain("input");
+    // Capability ids stay in module.action format.
+    const malformedId = CapabilityRequestV1Schema.safeParse({
+      ...base,
+      capability: "Not A Capability",
+      input: {},
+    });
+    expect(malformedId.success).toBe(false);
+    expect(issuePaths(malformedId)).toContain("capability");
+    // An unknown envelope field is reported on that field, not swallowed.
+    const unknownField = CapabilityRequestV1Schema.safeParse({
+      ...base,
+      capability: "mcp-docs.search_docs",
+      input: {},
+      unexpected: true,
+    });
+    expect(unknownField.success).toBe(false);
+    expect(issuePaths(unknownField)).toContain("unexpected");
   });
 });

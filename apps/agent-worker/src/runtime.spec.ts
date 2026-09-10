@@ -10,7 +10,7 @@ import type {
   ModelCheckTaskV1,
   RuntimeEventV1,
 } from "@agentmix/core";
-import { AGENT_RUN_MESSAGE_MAX_CHARS } from "@agentmix/core";
+import { AGENT_RUN_MESSAGE_MAX_CHARS, deriveProviderToolName } from "@agentmix/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentRuntime, createDefaultProvider } from "./runtime";
 
@@ -131,6 +131,40 @@ function runTask(capabilities: AgentRunTaskV1["capabilities"] = []): AgentRunTas
   };
 }
 
+function toolCallChunksFor(toolName: string, argsJson: string) {
+  return [
+    {
+      id: "chatcmpl-tool",
+      created: 1,
+      model: "test-model",
+      choices: [
+        {
+          index: 0,
+          delta: {
+            role: "assistant",
+            tool_calls: [
+              {
+                index: 0,
+                id: "call-generic-tool",
+                type: "function",
+                function: { name: toolName, arguments: argsJson },
+              },
+            ],
+          },
+          finish_reason: null,
+        },
+      ],
+    },
+    {
+      id: "chatcmpl-tool",
+      created: 1,
+      model: "test-model",
+      choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+      usage: { prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 },
+    },
+  ];
+}
+
 function modelCheckTask(): ModelCheckTaskV1 {
   return {
     version: 1,
@@ -214,6 +248,105 @@ describe("Agent Runtime OpenAI-compatible contract", () => {
     });
     expect(JSON.stringify(runEvents)).not.toContain("sentinel-api-key");
     expect(JSON.stringify(runEvents)).not.toContain(fake.baseURL);
+  });
+
+  it("builds provider tools from snapshot descriptors and bridges generic capability requests", async () => {
+    const fake = await startFakeProvider((_request, response, call) => {
+      sendSse(
+        response,
+        call === 1
+          ? toolCallChunksFor(deriveProviderToolName("mcp-docs.search_docs"), '{"query":"handbook"}')
+          : textChunks("Done"),
+      );
+    });
+    const harness = createHarness(fake.baseURL);
+    const task = runTask(["mcp-docs.search_docs"]);
+    const providerName = deriveProviderToolName("mcp-docs.search_docs");
+    task.tools = [
+      {
+        id: "mcp-docs.search_docs",
+        name: providerName,
+        description: "Search the handbook.",
+        inputSchema: {
+          type: "object",
+          properties: { query: { type: "string" } },
+          required: ["query"],
+          additionalProperties: false,
+        },
+      },
+    ];
+
+    await expect(harness.runtime.run(task)).resolves.toBe("completed");
+    expect(harness.requests).toHaveLength(1);
+    expect(harness.requests[0]).toMatchObject({
+      capability: "mcp-docs.search_docs",
+      input: { query: "handbook" },
+    });
+    const runEvents = harness.events as AgentRunEventV1[];
+    expect(runEvents.map((event) => event.type)).toEqual([
+      "run.started",
+      "capability.started",
+      "capability.completed",
+      "text.delta",
+      "run.completed",
+    ]);
+    expect(runEvents.find((event) => event.type === "capability.completed")).toMatchObject({
+      capability: "mcp-docs.search_docs",
+      resultCount: 1,
+      total: 1,
+    });
+  });
+
+  it("keeps every bound MCP tool reachable when two servers expose the same remote tool name", async () => {
+    // Both servers expose a tool literally named "search"; the control plane
+    // qualifies provider names with the capability id so neither can shadow the
+    // other in the Worker's tool set.
+    const fake = await startFakeProvider((_request, response, call) => {
+      sendSse(
+        response,
+        call === 1
+          ? toolCallChunksFor(deriveProviderToolName("mcp-github.search"), '{"query":"issue 42"}')
+          : textChunks("Done"),
+      );
+    });
+    const harness = createHarness(fake.baseURL, {
+      version: 1,
+      kind: "capability.result",
+      requestId: randomUUID(),
+      status: "completed",
+      output: { matches: ["a", "b"] },
+      completedAt: new Date().toISOString(),
+    });
+    const task = runTask(["mcp-docs.search", "mcp-github.search"]);
+    const docsName = deriveProviderToolName("mcp-docs.search");
+    const githubName = deriveProviderToolName("mcp-github.search");
+    task.tools = [
+      {
+        id: "mcp-docs.search",
+        name: docsName,
+        description: "Search the handbook.",
+        inputSchema: { type: "object", properties: { query: { type: "string" } } },
+      },
+      {
+        id: "mcp-github.search",
+        name: githubName,
+        description: "Search GitHub issues.",
+        inputSchema: { type: "object", properties: { query: { type: "string" } } },
+      },
+    ];
+
+    await expect(harness.runtime.run(task)).resolves.toBe("completed");
+    const offeredNames = (
+      fake.requests[0]!.body.tools as Array<{ function: { name: string } }>
+    ).map((entry) => entry.function.name);
+    expect(offeredNames).toEqual([docsName, githubName]);
+    expect(new Set(offeredNames).size).toBe(2);
+    // The call lands on the server the model actually named, not merely the
+    // last descriptor that happened to claim the bare name.
+    expect(harness.requests[0]).toMatchObject({
+      capability: "mcp-github.search",
+      input: { query: "issue 42" },
+    });
   });
 
   it("retries only a retryable 429 and resets partial attempt output", async () => {

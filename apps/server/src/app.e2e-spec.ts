@@ -7,8 +7,11 @@ import {
   AgentRunControlV1Schema,
   AgentRunEventV1Schema,
   AgentRunTaskV1Schema,
+  deriveProviderToolName,
   type AgentRunEventV1,
 } from "@agentmix/core";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -20,6 +23,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { AuditService } from "./audit/audit.service";
 import { DatabaseService } from "./database/database.service";
 import { seedDatabase } from "./database/seed-data";
@@ -85,7 +89,11 @@ function textChunks(text: string) {
   ];
 }
 
-function toolCallChunks() {
+function toolCallChunks(
+  name = "users_search",
+  argsJson = '{"search":"admin"}',
+  callId = "call-users-search-integration",
+) {
   return [
     {
       id: "chatcmpl-tool-integration",
@@ -99,9 +107,9 @@ function toolCallChunks() {
             tool_calls: [
               {
                 index: 0,
-                id: "call-users-search-integration",
+                id: callId,
                 type: "function",
-                function: { name: "users_search", arguments: '{"search":"admin"}' },
+                function: { name, arguments: argsJson },
               },
             ],
           },
@@ -171,6 +179,7 @@ describe("Phase 1C governed runtime", () => {
   let runtimeWorker: RunningWorker;
   let fakeProvider: ReturnType<typeof createServer>;
   let capabilityGate: ReturnType<typeof createCapabilityGate> | null = null;
+  let providerToolCallOverride: { name: string; argsJson: string } | null = null;
 
   beforeAll(async () => {
     [container, redisContainer] = await Promise.all([
@@ -188,6 +197,7 @@ describe("Phase 1C governed runtime", () => {
     process.env.BOOTSTRAP_ADMIN_USERNAME = "admin";
     process.env.BOOTSTRAP_ADMIN_PASSWORD = "correct-horse-battery-staple";
     process.env.MODEL = "integration-test-model";
+    process.env.MCP_E2E_TOKEN = "e2e-mcp-secret-token";
 
     const migrationPool = new Pool({ connectionString: process.env.DATABASE_URL });
     await migrate(drizzle(migrationPool), {
@@ -234,7 +244,12 @@ describe("Phase 1C governed runtime", () => {
         await capabilityGate.release;
       }
       if (body.tools?.length && !hasToolResult) {
-        sendSse(response, toolCallChunks());
+        sendSse(
+          response,
+          providerToolCallOverride
+            ? toolCallChunks(providerToolCallOverride.name, providerToolCallOverride.argsJson, "call-mcp-tool-integration")
+            : toolCallChunks(),
+        );
       } else if (body.tools?.length) {
         sendSse(response, textChunks("Found the governed administrator account."));
       } else {
@@ -2465,5 +2480,303 @@ describe("Phase 1C governed runtime", () => {
       if (response.status === 429) break;
     }
     expect(statuses).toContain(429);
+  });
+
+  it("syncs an MCP server, governs its tools, and executes a bound tool through the capability bridge", async () => {
+    const mcpCalls: Array<{ workspace: unknown; authorization: string | undefined }> = [];
+    const mcpHttp = createServer(async (incoming, response) => {
+      const authorization = incoming.headers.authorization;
+      if (authorization !== process.env.MCP_E2E_TOKEN) {
+        response.writeHead(401, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      let rawBody = "";
+      for await (const chunk of incoming) rawBody += String(chunk);
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+      const mcp = new McpServer({ name: "integration-mcp", version: "1.0.0" });
+      mcp.registerTool(
+        "get_workspace_info",
+        {
+          description: "Describe an AgentMix workspace.",
+          inputSchema: { workspace: z.string() },
+        },
+        async ({ workspace }) => {
+          mcpCalls.push({ workspace, authorization });
+          return {
+            content: [{ type: "text", text: `Workspace ${workspace} has 3 members.` }],
+            structuredContent: { workspace, members: 3, plan: "enterprise" },
+          };
+        },
+      );
+      await mcp.connect(transport);
+      response.on("close", () => {
+        void mcp.close();
+        void transport.close();
+      });
+      await transport.handleRequest(incoming, response, rawBody ? JSON.parse(rawBody) : undefined);
+    });
+    await new Promise<void>((resolve) => mcpHttp.listen(0, "127.0.0.1", resolve));
+    const mcpAddress = mcpHttp.address() as AddressInfo;
+
+    const admin = request.agent(app.getHttpServer());
+    await admin
+      .post("/api/auth/login")
+      .set("x-forwarded-for", "198.51.100.80")
+      .set("origin", "http://localhost:3100")
+      .send({ username: "admin", password: "correct-horse-battery-staple" })
+      .expect(200);
+
+    try {
+      const serverCreated = await admin
+        .post("/api/mcp/servers")
+        .set("origin", "http://localhost:3100")
+        .send({
+          slug: "integration-mcp",
+          name: "Integration MCP",
+          description: "E2E MCP tool server",
+          endpointUrl: `http://127.0.0.1:${mcpAddress.port}/mcp`,
+          authHeaderName: "Authorization",
+          authEnvVar: "MCP_E2E_TOKEN",
+          status: "active",
+        })
+        .expect(201);
+      expect(serverCreated.body).toMatchObject({
+        slug: "integration-mcp",
+        hasAuth: true,
+        authEnvVar: "MCP_E2E_TOKEN",
+        toolCount: 0,
+      });
+
+      // A partial update that omits the credential pair must preserve it: the
+      // admin form never round-trips the pair, so dropping it here would make
+      // every rename silently de-authenticate the server.
+      const renamed = await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ name: "Integration MCP renamed" })
+        .expect(200);
+      expect(renamed.body).toMatchObject({
+        name: "Integration MCP renamed",
+        hasAuth: true,
+        authEnvVar: "MCP_E2E_TOKEN",
+      });
+      // Null is refused instead of being treated as "clear".
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ authHeaderName: null, authEnvVar: null })
+        .expect(400);
+      // Half a pair is refused too.
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ authEnvVar: "MCP_OTHER_TOKEN" })
+        .expect(400);
+      // Replacing the pair keeps the server usable.
+      const rotated = await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ authHeaderName: "Authorization", authEnvVar: "MCP_E2E_TOKEN" })
+        .expect(200);
+      expect(rotated.body).toMatchObject({ hasAuth: true, authEnvVar: "MCP_E2E_TOKEN" });
+
+      await admin
+        .post("/api/mcp/servers")
+        .set("origin", "http://localhost:3100")
+        .send({
+          slug: "integration-mcp",
+          name: "Integration MCP duplicate",
+          endpointUrl: `http://127.0.0.1:${mcpAddress.port}/mcp`,
+        })
+        .expect(409);
+
+      const sync = await admin
+        .post(`/api/mcp/servers/${serverCreated.body.id}/sync`)
+        .set("origin", "http://localhost:3100")
+        .expect(200);
+      expect(sync.body).toMatchObject({ added: 1, updated: 0, removed: [] });
+      expect(sync.body.removed).toEqual([]);
+
+      const serverAfterSync = await admin.get("/api/mcp/servers").expect(200);
+      const serverRow = serverAfterSync.body.items.find(
+        (item: { id: string }) => item.id === serverCreated.body.id,
+      );
+      expect(serverRow.lastSyncedAt).toBeTruthy();
+      expect(serverRow.lastSyncErrorCode).toBeNull();
+
+      const toolList = await admin
+        .get(`/api/mcp/servers/${serverCreated.body.id}/tools`)
+        .expect(200);
+      const tool = toolList.body.items.find((item: { name: string }) => item.name === "get_workspace_info");
+      expect(tool).toMatchObject({ enabled: false, risk: "read", requiredPermissions: [] });
+
+      await admin
+        .put(`/api/mcp/tools/${tool.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ enabled: true })
+        .expect(409);
+      await admin
+        .put(`/api/mcp/tools/${tool.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ requiredPermissions: ["definitely:not-a-permission"], enabled: true })
+        .expect(409);
+      await admin
+        .put(`/api/mcp/tools/${tool.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ requiredPermissions: ["users:read"], risk: "read", enabled: true })
+        .expect(200);
+
+      const available = await admin.get("/api/chat/agents").expect(200);
+      const assistant = available.body.items.find(
+        (agent: { slug: string }) => agent.slug === "agentmix-assistant",
+      ) as { id: string };
+
+      await admin
+        .put(`/api/agents/${assistant.id}/tools`)
+        .set("origin", "http://localhost:3100")
+        .send({ toolIds: [randomUUID()] })
+        .expect(400);
+      await admin
+        .put(`/api/agents/${assistant.id}/tools`)
+        .set("origin", "http://localhost:3100")
+        .send({ toolIds: [tool.id] })
+        .expect(204);
+
+      // The model sees the provider-safe derivative of the capability id, not
+      // the bare remote tool name.
+      providerToolCallOverride = {
+        name: deriveProviderToolName("mcp-integration-mcp.get_workspace_info"),
+        argsJson: '{"workspace":"acme"}',
+      };
+      const created = await admin
+        .post("/api/conversations")
+        .set("origin", "http://localhost:3100")
+        .set("idempotency-key", randomUUID())
+        .send({ agentId: assistant.id, content: "Describe the acme workspace." })
+        .expect(202);
+
+      let run = created.body.run;
+      for (let index = 0; index < 200 && !["completed", "failed", "canceled"].includes(run.status); index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        run = (await admin.get(`/api/runs/${run.id}`).expect(200)).body;
+      }
+      expect(run).toMatchObject({
+        status: "completed",
+        assistantMessage: { content: "Found the governed administrator account." },
+      });
+
+      expect(mcpCalls).toHaveLength(1);
+      expect(mcpCalls[0]).toMatchObject({
+        workspace: "acme",
+        authorization: process.env.MCP_E2E_TOKEN,
+      });
+
+      const executedAudit = await database.db
+        .select({ resourceId: auditLogs.resourceId, metadata: auditLogs.metadata })
+        .from(auditLogs)
+        .where(eq(auditLogs.action, "capability.executed"))
+        .orderBy(auditLogs.createdAt)
+        .limit(50);
+      const mcpAudit = executedAudit.find((row) => row.resourceId === "mcp-integration-mcp.get_workspace_info");
+      expect(mcpAudit).toBeTruthy();
+      expect(mcpAudit?.metadata).toMatchObject({ risk: "read", capabilityVersion: "1.0.0" });
+
+      // Revoking the agent's required permission mid-run must turn the next
+      // MCP tool invocation into a governed capability failure.
+      await admin
+        .put(`/api/mcp/tools/${tool.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ enabled: true })
+        .expect(200);
+      const usersReadPermission = await database.db
+        .select({ id: permissions.id })
+        .from(permissions)
+        .where(and(eq(permissions.resource, "users"), eq(permissions.action, "read")))
+        .limit(1);
+      const revocationGate = createCapabilityGate();
+      capabilityGate = revocationGate;
+      let permissionRevoked = false;
+      try {
+        const revokedRequest = await admin
+          .post("/api/conversations")
+          .set("origin", "http://localhost:3100")
+          .set("idempotency-key", randomUUID())
+          .send({ agentId: assistant.id, content: "CAPABILITY_REVOCATION_PROBE" })
+          .expect(202);
+        await Promise.race([
+          revocationGate.reached,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("MCP revocation probe did not reach the model")), 5_000),
+          ),
+        ]);
+        await database.db
+          .delete(subjectPermissions)
+          .where(
+            and(
+              eq(subjectPermissions.subjectId, assistant.id),
+              eq(subjectPermissions.permissionId, usersReadPermission[0]!.id),
+            ),
+          );
+        permissionRevoked = true;
+        revocationGate.allow();
+
+        let revokedRun = revokedRequest.body.run;
+        for (
+          let index = 0;
+          index < 200 && !["completed", "failed", "canceled"].includes(revokedRun.status);
+          index += 1
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          revokedRun = (await admin.get(`/api/runs/${revokedRun.id}`).expect(200)).body;
+        }
+        expect(revokedRun).toMatchObject({ status: "failed", errorCode: "capability_failed" });
+        expect(mcpCalls).toHaveLength(1);
+      } finally {
+        revocationGate.allow();
+        capabilityGate = null;
+        if (permissionRevoked) {
+          await database.db
+            .insert(subjectPermissions)
+            .values({ subjectId: assistant.id, permissionId: usersReadPermission[0]!.id })
+            .onConflictDoNothing();
+        }
+      }
+
+      // clearAuth is the only way to remove the pair, and it takes effect.
+      const cleared = await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ clearAuth: true })
+        .expect(200);
+      expect(cleared.body).toMatchObject({ hasAuth: false, authEnvVar: null });
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ clearAuth: true })
+        .expect(400);
+      // Without credentials the server now rejects the sync; it fails closed
+      // with a stable safe code rather than leaking the remote response.
+      const unauthenticatedSync = await admin
+        .post(`/api/mcp/servers/${serverCreated.body.id}/sync`)
+        .set("origin", "http://localhost:3100")
+        .expect(502);
+      expect(unauthenticatedSync.body.message).toMatch(
+        /^MCP tool sync failed \((?:CONNECT_FAILED|PROTOCOL_ERROR|TIMEOUT)\)$/,
+      );
+      expect(JSON.stringify(unauthenticatedSync.body)).not.toContain(process.env.MCP_E2E_TOKEN!);
+    } catch (testError) {
+      console.log("MCP-TEST-ERROR", testError);
+      throw testError;
+    } finally {
+      providerToolCallOverride = null;
+      // Keep-alive sockets (and the MCP standby stream) would otherwise keep
+      // close()'s callback pending and swallow the real failure above.
+      mcpHttp.closeAllConnections();
+      await new Promise<void>((resolve) => mcpHttp.close(() => resolve()));
+    }
   });
 });

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-const CAPABILITY_ID_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
+/**
+ * Capability ids use module.action format. The action segment admits
+ * underscores so a registered MCP tool name (RFC: [a-z0-9_-]) can be embedded
+ * verbatim, e.g. "mcp-github.create_issue".
+ */
+export const CAPABILITY_ID_PATTERN = /^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$/;
 const MODULE_ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const PERMISSION_PATTERN = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;

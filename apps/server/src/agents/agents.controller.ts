@@ -8,6 +8,7 @@ import { CreateAgentDto } from "./dto/create-agent.dto";
 import { ListAgentsDto } from "./dto/list-agents.dto";
 import { ReplaceAgentPermissionsDto } from "./dto/replace-agent-permissions.dto";
 import { ReplaceAgentRolesDto } from "./dto/replace-agent-roles.dto";
+import { ReplaceAgentToolsDto } from "./dto/replace-agent-tools.dto";
 import { UpdateAgentAccessDto } from "./dto/update-agent-access.dto";
 import { UpdateAgentRuntimeDto } from "./dto/update-agent-runtime.dto";
 import { UpdateAgentDto } from "./dto/update-agent.dto";
@@ -96,6 +97,26 @@ export class AgentsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.agents.updateAccess(agentId, dto, {
+      actorSubjectId: request.auth.subjectId,
+      ...getRequestMetadata(request),
+    });
+  }
+
+  @RequirePermissions("agents:assign-tools")
+  @Get(":id/tools")
+  getTools(@Param("id", new ParseUUIDPipe()) agentId: string) {
+    return this.agents.getTools(agentId);
+  }
+
+  @RequirePermissions("agents:assign-tools")
+  @HttpCode(204)
+  @Put(":id/tools")
+  replaceTools(
+    @Param("id", new ParseUUIDPipe()) agentId: string,
+    @Body() dto: ReplaceAgentToolsDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.agents.replaceTools(agentId, dto.toolIds, {
       actorSubjectId: request.auth.subjectId,
       ...getRequestMetadata(request),
     });

@@ -1,0 +1,96 @@
+{
+  "page": {
+    "eyebrow": "工具治理 / MCP 注册表",
+    "title": "MCP 工具注册表",
+    "description": "注册 MCP 工具服务器（Streamable HTTP），发现其工具，并通过风险等级与所需权限治理每个工具，之后才允许 Agent 绑定调用。",
+    "newServer": "注册服务器"
+  },
+  "stats": {
+    "servers": "服务器",
+    "active": "启用中",
+    "secretsEnvOnly": "密钥仅存于环境变量"
+  },
+  "table": {
+    "server": "服务器",
+    "endpoint": "端点",
+    "tools": "工具",
+    "toolsUnit": "个",
+    "lastSync": "最近同步",
+    "neverSynced": "从未同步",
+    "status": "状态",
+    "sync": "同步",
+    "edit": "编辑",
+    "view": "查看",
+    "deleteConfirm": "删除该 MCP 服务器及其全部工具绑定？"
+  },
+  "drawer": {
+    "createTitle": "注册 MCP 服务器",
+    "editTitle": "MCP 服务器 / {slug}"
+  },
+  "form": {
+    "slugLabel": "标识（slug）",
+    "slugRequired": "必须填写标识",
+    "slugPattern": "只能使用小写 kebab-case",
+    "slugLength": "长度需在 3 到 64 个字符之间",
+    "slugPlaceholder": "github-tools",
+    "nameLabel": "名称",
+    "namePlaceholder": "GitHub MCP Server",
+    "endpointLabel": "端点 URL",
+    "endpointRequired": "必须填写端点 URL",
+    "endpointPattern": "必须以 http:// 或 https:// 开头",
+    "descriptionLabel": "描述",
+    "descriptionPlaceholder": "该 MCP 服务器提供什么能力",
+    "authHeaderLabel": "认证 Header",
+    "authHeaderPattern": "仅允许 Header 名字符",
+    "authEnvVarLabel": "认证环境变量",
+    "authEnvVarTooltip": "这里只保存变量名；密钥值在连接时从服务端环境变量读取。",
+    "authEnvVarPattern": "仅允许大写下划线格式",
+    "statusLabel": "状态",
+    "statusActive": "启用",
+    "statusDisabled": "停用",
+    "authStoredHint": "凭据已配置。两个字段留空即保持 {envVar} 不变。",
+    "authClearAction": "清除凭据",
+    "authClearCancel": "保留凭据",
+    "authClearWarning": "保存后将删除该服务器的凭据，在重新配置之前同步与工具调用都会失败。",
+    "authAbsentHint": "尚未配置凭据。同时填写两个字段即可添加由环境变量提供的认证头。"
+  },
+  "buttons": {
+    "cancel": "取消",
+    "saveServer": "保存服务器",
+    "createServer": "注册服务器"
+  },
+  "notices": {
+    "synced": "同步完成：新增 {added} 个、更新 {updated} 个、移除 {removed} 个。"
+  },
+  "errors": {
+    "saveFailed": "保存 MCP 服务器失败。",
+    "syncFailed": "工具同步失败。",
+    "deleteFailed": "删除 MCP 服务器失败。",
+    "authPairRequired": "认证头与认证环境变量必须同时填写。"
+  },
+  "toolDrawer": {
+    "title": "工具 / {name}",
+    "discoveryHint": "新发现的工具默认停用且无权限。请先配置所需权限再启用，然后在 Agent 页面将工具绑定给 Agent。"
+  },
+  "toolTable": {
+    "tool": "工具",
+    "noDescription": "暂无描述",
+    "risk": {
+      "read": "读取",
+      "sensitive_read": "敏感读取",
+      "write": "写入",
+      "critical": "关键"
+    },
+    "permissions": "所需权限",
+    "noPermissions": "未配置",
+    "enabled": "启用"
+  },
+  "actions": {
+    "forbidden": "你没有管理 MCP 工具注册表的权限。",
+    "conflict": "该变更与现有 MCP 服务器或工具冲突。",
+    "invalid": "输入不合法：{message}",
+    "notFound": "该 MCP 服务器或工具已不存在。",
+    "syncFailed": "工具同步失败：{message}",
+    "serviceUnavailable": "控制面 API 不可用。"
+  }
+}

@@ -3,6 +3,7 @@ export * from "./schema/organization";
 export * from "./schema/rbac";
 export * from "./schema/agents";
 export * from "./schema/models";
+export * from "./schema/mcp";
 export * from "./schema/runtime";
 export * from "./schema/conversations";
 export * from "./schema/auth";

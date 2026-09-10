@@ -54,7 +54,8 @@
     "profile": "Profile",
     "capabilities": "Capabilities",
     "runtime": "Runtime",
-    "access": "Who can invoke"
+    "access": "Who can invoke",
+    "tools": "Tools"
   },
   "profile": {
     "heading": "Profile",
@@ -135,7 +136,8 @@
     "permissionsFailed": "Unable to save direct permissions.",
     "permissionsSurfaceFailed": "Direct permissions were saved, but the latest capability surface could not be loaded.",
     "runtimeFailed": "Unable to save the Agent runtime.",
-    "accessFailed": "Unable to save Agent invocation access."
+    "accessFailed": "Unable to save Agent invocation access.",
+    "toolsFailed": "Failed to update tool bindings."
   },
   "notices": {
     "profileSaved": "Profile boundary saved independently.",
@@ -153,7 +155,29 @@
       "agentRoles": "agent role assignments",
       "agentPermissions": "agent direct permissions",
       "agentRuntime": "agent runtime",
-      "agentAccess": "agent invocation access"
+      "agentAccess": "agent invocation access",
+      "agentTools": "tool bindings"
+    }
+  },
+  "tools": {
+    "heading": "Bound MCP tools",
+    "headingDetail": "Bound tools are exposed to the model only when both the invoking user and the agent hold each tool's required permissions at run time.",
+    "save": "Save Tool Bindings",
+    "empty": "No MCP tools discovered yet.",
+    "catalogUnavailable": "MCP tool catalog could not be loaded.",
+    "catalogRequiredTitle": "MCP registry read permission required",
+    "catalogRequiredDetail": "Ask an administrator for mcp-servers:read to browse and select tools here.",
+    "columnServer": "Server",
+    "columnTool": "Tool",
+    "columnRisk": "Risk",
+    "columnPermissions": "Required permissions",
+    "columnEnabled": "Enabled",
+    "saved": "Tool bindings updated.",
+    "risk": {
+      "read": "Read",
+      "sensitive_read": "Sensitive read",
+      "write": "Write",
+      "critical": "Critical"
     }
   }
 }

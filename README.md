@@ -46,12 +46,15 @@ Docker Desktop includes the `docker compose` subcommand, so the legacy standalon
 
 Post-Phase 1 console polish: the Admin console ships a collapsible sidebar layout (icon rail with hover flyouts, drawer on mobile) and Simplified Chinese / English internationalization via next-intl — the locale is remembered in a cookie and switchable from the top bar and the sign-in page.
 
-The Worker never reads PostgreSQL or calls Server HTTP, and the Server never calls the model. Credentials stay in Worker environment variables. General MCP transport, approval flows, and versioned Agent releases remain Phase 2 work.
+The Worker never reads PostgreSQL or calls Server HTTP, and the Server never calls the model. Credentials stay in Worker environment variables.
+
+Phase 2A is complete: an MCP tool registry (Streamable HTTP) in the control plane discovers and governs tools with risk levels and required permissions, agents bind tools through a dedicated permission, and the Worker builds provider tools from immutable snapshot descriptors — every tool call still flows back through the governed capability bridge for dual RBAC and audit. Approval flows and versioned Agent releases remain Phase 2B/2C work.
 
 Roadmap:
 
 - [x] Phase 1 "RuoYi with AI": governed model-to-Agent-to-Runtime-to-tool-to-audit vertical loop
 - [ ] Phase 2 "Agents as resources": declarative agent definitions + MCP tool registry + versioned releases + HITL approvals
+  - [x] Phase 2A — MCP tool registry (Streamable HTTP), governed tool bindings, generic snapshot-driven tool bridge
 - [ ] Phase 3 "Enterprise depth": cost allocation + evals + knowledge-base plugin + OIDC
 
 ## License

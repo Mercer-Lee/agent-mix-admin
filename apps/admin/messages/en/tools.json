@@ -1,0 +1,96 @@
+{
+  "page": {
+    "eyebrow": "Tool governance / MCP registry",
+    "title": "MCP Tool Registry",
+    "description": "Register MCP tool servers (Streamable HTTP), discover their tools, and govern every tool with risk levels and required permissions before agents can bind them.",
+    "newServer": "Register Server"
+  },
+  "stats": {
+    "servers": "Servers",
+    "active": "Active",
+    "secretsEnvOnly": "Secrets stay in environment variables"
+  },
+  "table": {
+    "server": "Server",
+    "endpoint": "Endpoint",
+    "tools": "Tools",
+    "toolsUnit": "tools",
+    "lastSync": "Last sync",
+    "neverSynced": "Never synced",
+    "status": "Status",
+    "sync": "Sync",
+    "edit": "Edit",
+    "view": "View",
+    "deleteConfirm": "Delete this MCP server and all of its tool bindings?"
+  },
+  "drawer": {
+    "createTitle": "Register MCP Server",
+    "editTitle": "MCP Server / {slug}"
+  },
+  "form": {
+    "slugLabel": "Slug",
+    "slugRequired": "Slug is required",
+    "slugPattern": "Lowercase kebab-case only",
+    "slugLength": "Between 3 and 64 characters",
+    "slugPlaceholder": "github-tools",
+    "nameLabel": "Name",
+    "namePlaceholder": "GitHub MCP Server",
+    "endpointLabel": "Endpoint URL",
+    "endpointRequired": "Endpoint URL is required",
+    "endpointPattern": "Must start with http:// or https://",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What this MCP server provides",
+    "authHeaderLabel": "Auth header",
+    "authHeaderPattern": "Header name characters only",
+    "authEnvVarLabel": "Auth env variable",
+    "authEnvVarTooltip": "Only the variable name is stored; the secret value is read from the server environment at connect time.",
+    "authEnvVarPattern": "UPPER_SNAKE_CASE only",
+    "statusLabel": "Status",
+    "statusActive": "Active",
+    "statusDisabled": "Disabled",
+    "authStoredHint": "Credentials are stored. Leave both fields blank to keep {envVar} unchanged.",
+    "authClearAction": "Clear credentials",
+    "authClearCancel": "Keep credentials",
+    "authClearWarning": "Saving now will remove this server's credentials; the next sync or tool call will fail until a new pair is configured.",
+    "authAbsentHint": "No credentials configured. Enter both fields to add a header backed by an environment variable."
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "saveServer": "Save Server",
+    "createServer": "Register Server"
+  },
+  "notices": {
+    "synced": "Sync finished: {added} added, {updated} updated, {removed} removed."
+  },
+  "errors": {
+    "saveFailed": "Failed to save the MCP server.",
+    "syncFailed": "Tool sync failed.",
+    "deleteFailed": "Failed to delete the MCP server.",
+    "authPairRequired": "Auth header and auth env variable must be provided together."
+  },
+  "toolDrawer": {
+    "title": "Tools / {name}",
+    "discoveryHint": "New tools arrive disabled with no permissions. Assign required permissions before enabling, then bind tools to agents on the agent page."
+  },
+  "toolTable": {
+    "tool": "Tool",
+    "noDescription": "No description",
+    "risk": {
+      "read": "Read",
+      "sensitive_read": "Sensitive read",
+      "write": "Write",
+      "critical": "Critical"
+    },
+    "permissions": "Required permissions",
+    "noPermissions": "None assigned",
+    "enabled": "Enabled"
+  },
+  "actions": {
+    "forbidden": "You do not have permission to manage the MCP tool registry.",
+    "conflict": "That change conflicts with an existing MCP server or tool.",
+    "invalid": "Invalid input: {message}",
+    "notFound": "The MCP server or tool no longer exists.",
+    "syncFailed": "Tool sync failed: {message}",
+    "serviceUnavailable": "Control-plane API is unavailable."
+  }
+}

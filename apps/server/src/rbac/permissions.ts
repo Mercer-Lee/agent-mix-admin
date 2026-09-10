@@ -23,6 +23,17 @@ export const CORE_PERMISSIONS = [
     description: "Configure who may invoke an agent",
   },
   { resource: "agents", action: "invoke", description: "Invoke an authorized agent" },
+  {
+    resource: "agents",
+    action: "assign-tools",
+    description: "Replace agent tool bindings",
+  },
+  { resource: "mcp-servers", action: "read", description: "View the MCP tool registry" },
+  {
+    resource: "mcp-servers",
+    action: "manage",
+    description: "Register, sync, and configure MCP tool servers",
+  },
   { resource: "models", action: "read", description: "View model profiles" },
   { resource: "models", action: "create", description: "Create model profiles" },
   { resource: "models", action: "update", description: "Update model profiles" },

@@ -3,10 +3,11 @@ import { cookies } from "next/headers";
 import { defaultLocale, LOCALE_COOKIE, locales, type AppLocale } from "./config";
 
 async function loadMessages(locale: AppLocale) {
-  const [common, agents, models, audit, chat] = await Promise.all([
+  const [common, agents, models, tools, audit, chat] = await Promise.all([
     import(`../messages/${locale}/common.json`),
     import(`../messages/${locale}/agents.json`),
     import(`../messages/${locale}/models.json`),
+    import(`../messages/${locale}/tools.json`),
     import(`../messages/${locale}/audit.json`),
     import(`../messages/${locale}/chat.json`),
   ]);
@@ -14,6 +15,7 @@ async function loadMessages(locale: AppLocale) {
     ...common.default,
     agents: agents.default,
     models: models.default,
+    tools: tools.default,
     audit: audit.default,
     chat: chat.default,
   };

@@ -54,7 +54,8 @@
     "profile": "Profile",
     "capabilities": "能力",
     "runtime": "运行时",
-    "access": "谁可调用"
+    "access": "谁可调用",
+    "tools": "工具"
   },
   "profile": {
     "heading": "Profile",
@@ -135,7 +136,8 @@
     "permissionsFailed": "无法保存直接权限。",
     "permissionsSurfaceFailed": "直接权限已保存，但无法加载最新能力面。",
     "runtimeFailed": "无法保存该 Agent 的运行时。",
-    "accessFailed": "无法保存该 Agent 的调用授权。"
+    "accessFailed": "无法保存该 Agent 的调用授权。",
+    "toolsFailed": "更新工具绑定失败。"
   },
   "notices": {
     "profileSaved": "Profile 边界已独立保存。",
@@ -153,7 +155,29 @@
       "agentRoles": "Agent 角色分配",
       "agentPermissions": "Agent 直接权限",
       "agentRuntime": "Agent 运行时",
-      "agentAccess": "Agent 调用授权"
+      "agentAccess": "Agent 调用授权",
+      "agentTools": "工具绑定"
+    }
+  },
+  "tools": {
+    "heading": "已绑定的 MCP 工具",
+    "headingDetail": "绑定工具只有在发起用户与 Agent 在运行时都持有工具所需权限时，才会暴露给模型。",
+    "save": "保存工具绑定",
+    "empty": "尚未发现任何 MCP 工具。",
+    "catalogUnavailable": "MCP 工具目录加载失败。",
+    "catalogRequiredTitle": "需要 MCP 注册表读取权限",
+    "catalogRequiredDetail": "请联系管理员授予 mcp-servers:read 权限后在此浏览和选择工具。",
+    "columnServer": "服务器",
+    "columnTool": "工具",
+    "columnRisk": "风险",
+    "columnPermissions": "所需权限",
+    "columnEnabled": "启用",
+    "saved": "工具绑定已更新。",
+    "risk": {
+      "read": "读取",
+      "sensitive_read": "敏感读取",
+      "write": "写入",
+      "critical": "关键"
     }
   }
 }

@@ -46,7 +46,9 @@ Docker Desktop 已内置 `docker compose` 子命令，无需另行安装旧版 `
 
 Phase 1 之后的控制台打磨：Admin 控制台已具备可折叠侧边栏布局（图标栏 + 悬停浮层，移动端抽屉）与中英双语（基于 next-intl，语言记忆在 Cookie，顶栏与登录页均可切换）。
 
-Worker 不读 PostgreSQL、不调用 Server HTTP，Server 不直接调用模型；凭证只存在于 Worker 环境。通用 MCP 传输、审批流和 Agent 版本发布仍属于 Phase 2。
+Worker 不读 PostgreSQL、不调用 Server HTTP，Server 不直接调用模型；凭证只存在于 Worker 环境。
+
+Phase 2A 已完成：控制面新增 MCP 工具注册表（Streamable HTTP），发现工具并按风险等级与所需权限治理，Agent 通过专用权限绑定工具，Worker 依据不可变执行快照中的工具描述符动态构造工具——每次工具调用仍经受治理的 capability 通道回传控制面做双重 RBAC 与审计。审批流与 Agent 版本发布仍属于 Phase 2B/2C。
 
 这个项目为什么存在、边界在哪里，见 [docs/vision.md](docs/vision.md)（愿景与缘起）；架构设计见 [docs/architecture.md](docs/architecture.md)。
 
@@ -54,6 +56,7 @@ Worker 不读 PostgreSQL、不调用 Server HTTP，Server 不直接调用模型�
 
 - [x] Phase 1「带 AI 的若依」：模型 → Agent → Runtime → 工具 → 审计纵向闭环
 - [ ] Phase 2「Agent 资源化」：声明式 Agent 定义 + MCP 工具注册 + 版本发布 + HITL 审批
+  - [x] Phase 2A —— MCP 工具注册表（Streamable HTTP）、受治理工具绑定、快照驱动的通用工具桥
 - [ ] Phase 3「企业深化」：成本分摊 + 评测 + 知识库插件 + OIDC
 
 ## License

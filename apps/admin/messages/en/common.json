@@ -11,6 +11,7 @@
     "nav": {
       "overview": "Overview",
       "models": "Models",
+      "tools": "Tools",
       "agents": "Agents",
       "workbench": "Workbench",
       "audit": "Audit"

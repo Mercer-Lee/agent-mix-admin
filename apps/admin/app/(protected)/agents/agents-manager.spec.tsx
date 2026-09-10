@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   permissions: vi.fn(),
   runtime: vi.fn(),
   access: vi.fn(),
+  tools: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -30,6 +31,7 @@ vi.mock("./actions", () => ({
   updateAgentPermissionsAction: mocks.permissions,
   updateAgentRuntimeAction: mocks.runtime,
   updateAgentAccessAction: mocks.access,
+  replaceAgentToolsAction: mocks.tools,
 }));
 
 const initialData: AgentListResponse = {
@@ -57,6 +59,8 @@ const fullAccess: AgentManagerAccess = {
   canAssignPermissions: true,
   canConfigureRuntime: true,
   canAssignAccess: true,
+  canAssignTools: true,
+  canReadMcpServers: true,
   canReadUsers: true,
   canReadRoles: true,
   canReadDepartments: true,
@@ -153,6 +157,9 @@ function mockDetailRequests() {
     if (path.endsWith("/access")) {
       return new Response(JSON.stringify({ agentId: detail.id, users: [], roles: [], departments: [] }), { status: 200 });
     }
+    if (path.endsWith(`/agents/${detail.id}/tools`)) {
+      return new Response(JSON.stringify({ agentId: detail.id, toolIds: [] }), { status: 200 });
+    }
     return new Response(JSON.stringify(detail), { status: 200 });
   });
 }
@@ -201,6 +208,79 @@ describe("AgentsManager", () => {
 
     const loggedErrors = consoleError.mock.calls.flat().map(String).join("\n");
     expect(loggedErrors).not.toContain("Instance created by `useForm` is not connected");
+  });
+
+  it("hides the tools tab without the assign-tools permission and lists only selectable MCP tools", async () => {
+    const mcpToolId = "019d2f5b-a8ab-7000-8000-0000000000aa";
+    const disabledToolId = "019d2f5b-a8ab-7000-8000-0000000000bb";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith("/capabilities")) return new Response(JSON.stringify([]), { status: 200 });
+      if (path.endsWith("/runtime")) return new Response(JSON.stringify(runtime), { status: 200 });
+      if (path.endsWith("/access")) {
+        return new Response(JSON.stringify({ agentId: detail.id, users: [], roles: [], departments: [] }), { status: 200 });
+      }
+      if (path.endsWith(`/agents/${detail.id}/tools`)) {
+        return new Response(JSON.stringify({ agentId: detail.id, toolIds: [mcpToolId] }), { status: 200 });
+      }
+      if (path.endsWith("/mcp/servers")) {
+        return new Response(
+          JSON.stringify({ items: [{ id: "server-1", slug: "docs", name: "Docs", status: "active" }] }),
+          { status: 200 },
+        );
+      }
+      if (path.endsWith("/mcp/servers/server-1/tools")) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: mcpToolId,
+                name: "search_docs",
+                description: "Search the handbook.",
+                risk: "read",
+                requiredPermissions: ["users:read"],
+                enabled: true,
+              },
+              {
+                id: disabledToolId,
+                name: "delete_docs",
+                description: "Delete a document.",
+                risk: "critical",
+                requiredPermissions: ["users:read"],
+                enabled: false,
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify(detail), { status: 200 });
+    });
+    const user = userEvent.setup();
+    mocks.tools.mockResolvedValue({ ok: true });
+    renderManager();
+
+    await user.click(screen.getByTestId(`agent-action-${detail.id}`));
+    await user.click(await screen.findByTestId("agent-tab-tools"));
+    expect(await screen.findByText("search_docs")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toContain("/api/mcp/servers");
+
+    // A tool that is not enabled on its server must not be bindable.
+    expect(screen.getByTestId(`tool-select-${disabledToolId}`)).toBeDisabled();
+    expect(screen.getByTestId(`tool-select-${mcpToolId}`)).toBeChecked();
+
+    await user.click(screen.getByTestId("save-agent-tools"));
+    await waitFor(() => expect(mocks.tools).toHaveBeenCalledWith(detail.id, [mcpToolId]));
+  });
+
+  it("does not render the tools tab without the assign-tools permission", async () => {
+    mockDetailRequests();
+    const user = userEvent.setup();
+    renderManager({ ...fullAccess, canAssignTools: false });
+
+    await user.click(screen.getByTestId(`agent-action-${detail.id}`));
+    await screen.findByDisplayValue("Directory Agent");
+    expect(screen.queryByTestId("agent-tab-tools")).not.toBeInTheDocument();
   });
 
   it("hydrates access and runtime forms when their data resolves before first tab activation", async () => {
@@ -357,6 +437,9 @@ describe("AgentsManager", () => {
       if (path.endsWith("/access")) {
         return new Response(JSON.stringify({ agentId: detail.id, users: [], roles: [], departments: [] }), { status: 200 });
       }
+      if (path.endsWith(`/agents/${detail.id}/tools`)) {
+        return new Response(JSON.stringify({ agentId: detail.id, toolIds: [] }), { status: 200 });
+      }
       detailReads += 1;
       const effectivePermissions = detailReads === 1
         ? []
@@ -407,6 +490,8 @@ describe("AgentsManager", () => {
       canAssignPermissions: false,
       canConfigureRuntime: false,
       canAssignAccess: false,
+      canAssignTools: false,
+      canReadMcpServers: false,
       canReadUsers: false,
       canReadRoles: false,
       canReadDepartments: false,

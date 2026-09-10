@@ -10,6 +10,7 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
   const candidates: Array<AppNavItem & { visible: boolean }> = [
     { key: "overview", href: "/", visible: true },
     { key: "models", href: "/models", visible: auth.permissions.includes("models:read") },
+    { key: "tools", href: "/tools", visible: auth.permissions.includes("mcp-servers:read") },
     { key: "agents", href: "/agents", visible: auth.permissions.includes("agents:read") },
     { key: "workbench", href: "/chat", visible: auth.permissions.includes("agents:invoke") },
     {

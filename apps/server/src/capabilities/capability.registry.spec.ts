@@ -53,4 +53,17 @@ describe("CapabilityRegistry", () => {
 
     expect(() => registry.register(invalid)).toThrow("capability id must use module.action format");
   });
+
+  it("removes a capability for its owner only", () => {
+    const registry = new CapabilityRegistry();
+    registry.register(createCapability());
+
+    // A stale caller from another module must not evict a live capability.
+    expect(registry.unregister("users.search", { module: "mcp-docs" })).toBe(false);
+    expect(registry.get("users.search")).toBeDefined();
+
+    expect(registry.unregister("users.search", { module: "users" })).toBe(true);
+    expect(registry.get("users.search")).toBeUndefined();
+    expect(registry.unregister("users.search", { module: "users" })).toBe(false);
+  });
 });

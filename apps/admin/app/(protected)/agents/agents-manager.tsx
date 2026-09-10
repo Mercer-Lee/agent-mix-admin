@@ -13,6 +13,7 @@ import {
   SearchOutlined,
   SettingOutlined,
   TeamOutlined,
+  ToolOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import {
@@ -28,8 +29,8 @@ import {
   Space,
   Switch,
   Table,
-  Tabs,
   Tag,
+  Tabs,
   Tooltip,
   Typography,
   type TableProps,
@@ -44,6 +45,7 @@ import {
   updateAgentProfileAction,
   updateAgentRolesAction,
   updateAgentRuntimeAction,
+  replaceAgentToolsAction,
 } from "./actions";
 import type {
   AgentDetail,
@@ -53,8 +55,10 @@ import type {
   AgentProfileMutationInput,
   AgentRuntime,
   AgentSummary,
+  AgentToolsState,
   CapabilityDescriptor,
   DepartmentOption,
+  McpToolOption,
   ModelProfileOption,
   PermissionOption,
   RoleOption,
@@ -165,6 +169,11 @@ export function AgentsManager({
   const [capabilities, setCapabilities] = useState<CapabilityDescriptor[]>([]);
   const [runtime, setRuntime] = useState<AgentRuntime | null>(null);
   const [invocationAccess, setInvocationAccess] = useState<AgentInvocationAccess | null>(null);
+  const [agentTools, setAgentTools] = useState<AgentToolsState | null>(null);
+  const [boundToolIds, setBoundToolIds] = useState<string[]>([]);
+  const [mcpToolCatalog, setMcpToolCatalog] = useState<McpToolOption[]>([]);
+  const [mcpToolCatalogLoaded, setMcpToolCatalogLoaded] = useState(false);
+  const [mcpToolCatalogLoading, setMcpToolCatalogLoading] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [authorizationSurfaceUnavailable, setAuthorizationSurfaceUnavailable] = useState(false);
@@ -315,6 +324,10 @@ export function AgentsManager({
     setSelected(null);
     setRuntime(null);
     setInvocationAccess(null);
+    setAgentTools(null);
+    setBoundToolIds([]);
+    setMcpToolCatalog([]);
+    setMcpToolCatalogLoaded(false);
     setCapabilities([]);
     setAuthorizationSurfaceUnavailable(false);
     setError(null);
@@ -332,6 +345,10 @@ export function AgentsManager({
     setSelected(null);
     setRuntime(null);
     setInvocationAccess(null);
+    setAgentTools(null);
+    setBoundToolIds([]);
+    setMcpToolCatalog([]);
+    setMcpToolCatalogLoaded(false);
     setCapabilities([]);
     setAuthorizationSurfaceUnavailable(false);
     setError(null);
@@ -339,7 +356,7 @@ export function AgentsManager({
     setDrawerOpen(true);
     setLoadingDetail(true);
     try {
-      const [detail, availableCapabilities, runtimeResult, accessResult] = await Promise.all([
+      const [detail, availableCapabilities, runtimeResult, accessResult, toolsResult] = await Promise.all([
         readJson<AgentDetail>(`/api/agents/${agent.id}`, controller.signal),
         readJson<CapabilityDescriptor[]>(`/api/agents/${agent.id}/capabilities`, controller.signal),
         access.canConfigureRuntime
@@ -348,6 +365,9 @@ export function AgentsManager({
         access.canAssignAccess
           ? readJson<AgentInvocationAccess>(`/api/agents/${agent.id}/access`, controller.signal)
           : Promise.resolve(null),
+        access.canAssignTools
+          ? readJson<AgentToolsState>(`/api/agents/${agent.id}/tools`, controller.signal)
+          : Promise.resolve(null),
       ]);
       if (!isCurrentDetailRequest(generation, agent.id)) return;
       setSelected(detail);
@@ -355,6 +375,8 @@ export function AgentsManager({
       setAuthorizationSurfaceUnavailable(false);
       setRuntime(runtimeResult);
       setInvocationAccess(accessResult);
+      setAgentTools(toolsResult);
+      setBoundToolIds(toolsResult?.toolIds ?? []);
     } catch (requestError) {
       if (controller.signal.aborted || !isCurrentDetailRequest(generation, agent.id)) return;
       if (requestError instanceof ApiRequestError && requestError.status === 403) {
@@ -418,6 +440,11 @@ export function AgentsManager({
     if (!reachedEnd || loadingUsers || userCandidates.length >= userDirectoryTotal) return;
     void loadUserDirectory(userSearchRef.current, userDirectoryPage + 1, true);
   }
+
+  useEffect(() => {
+    if (!drawerOpen || mode !== "detail" || activeDetailTab !== "tools") return;
+    void loadMcpToolCatalog();
+  }, [drawerOpen, mode, activeDetailTab, access.canReadMcpServers, mcpToolCatalogLoaded, mcpToolCatalogLoading]);
 
   useEffect(() => {
     if (!drawerOpen || mode !== "detail" || !selected || activeDetailTab !== "profile") return;
@@ -610,6 +637,61 @@ export function AgentsManager({
     }
     setInvocationAccess(result.data);
     setNotice(t("notices.accessSaved"));
+    router.refresh();
+  }
+
+  async function loadMcpToolCatalog() {
+    if (!access.canReadMcpServers || mcpToolCatalogLoaded || mcpToolCatalogLoading) return;
+    setMcpToolCatalogLoading(true);
+    try {
+      const servers = await readJson<{ items: Array<{ id: string; slug: string; name: string; status: string }> }>(
+        "/api/mcp/servers",
+      );
+      const toolLists = await Promise.all(
+        servers.items.map(async (server) => {
+          try {
+            const response = await readJson<{
+              items: Array<{
+                id: string;
+                name: string;
+                description: string;
+                risk: McpToolOption["risk"];
+                requiredPermissions: string[];
+                enabled: boolean;
+              }>;
+            }>(`/api/mcp/servers/${server.id}/tools`);
+            return response.items.map((tool) => ({
+              ...tool,
+              serverSlug: server.slug,
+              serverName: server.name,
+            }));
+          } catch {
+            return [];
+          }
+        }),
+      );
+      setMcpToolCatalog(toolLists.flat().sort((left, right) => left.serverSlug.localeCompare(right.serverSlug) || left.name.localeCompare(right.name)));
+      setMcpToolCatalogLoaded(true);
+    } catch {
+      setNotice(t("tools.catalogUnavailable"));
+    } finally {
+      setMcpToolCatalogLoading(false);
+    }
+  }
+
+  async function saveTools() {
+    if (!selected) return;
+    setSavingSection("tools");
+    setError(null);
+    setNotice(null);
+    const result = await replaceAgentToolsAction(selected.id, boundToolIds);
+    setSavingSection(null);
+    if (!result.ok) {
+      setError(result.error ?? t("errors.toolsFailed"));
+      return;
+    }
+    setAgentTools({ agentId: selected.id, toolIds: boundToolIds });
+    setNotice(t("tools.saved"));
     router.refresh();
   }
 
@@ -910,6 +992,115 @@ export function AgentsManager({
                   </div>
                 ) : null}
               </Form>
+            </div>
+          ),
+        }] : []),
+        ...(access.canAssignTools ? [{
+          key: "tools",
+          label: (
+            <span data-testid="agent-tab-tools">
+              <ToolOutlined /> {t("tabs.tools")}
+            </span>
+          ),
+          children: (
+            <div className="pt-4">
+              <SectionHeading
+                icon={<ToolOutlined />}
+                title={t("tools.heading")}
+                detail={t("tools.headingDetail")}
+              />
+              {!access.canReadMcpServers ? (
+                <Alert
+                  className="mb-5"
+                  type="info"
+                  showIcon
+                  title={t("tools.catalogRequiredTitle")}
+                  description={t("tools.catalogRequiredDetail")}
+                />
+              ) : null}
+              <Table<McpToolOption>
+                rowKey="id"
+                size="small"
+                loading={mcpToolCatalogLoading}
+                dataSource={mcpToolCatalog}
+                locale={{ emptyText: <Empty description={t("tools.empty")} /> }}
+                pagination={false}
+                rowSelection={{
+                  selectedRowKeys: boundToolIds,
+                  onChange: (keys) => setBoundToolIds(keys as string[]),
+                  getCheckboxProps: (tool) => ({
+                    disabled: !tool.enabled,
+                    "data-testid": `tool-select-${tool.id}`,
+                  }),
+                }}
+                columns={[
+                  {
+                    title: t("tools.columnServer"),
+                    dataIndex: "serverSlug",
+                    width: 150,
+                    render: (value: string) => <span className="font-mono text-xs text-zinc-400">{value}</span>,
+                  },
+                  {
+                    title: t("tools.columnTool"),
+                    dataIndex: "name",
+                    render: (value: string, tool) => (
+                      <div>
+                        <span className="font-mono text-xs text-zinc-100">{value}</span>
+                        <div className="mt-1 text-xs text-zinc-500">{tool.description}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    title: t("tools.columnRisk"),
+                    dataIndex: "risk",
+                    width: 130,
+                    render: (risk: McpToolOption["risk"]) => (
+                      <Tag
+                        color={
+                          risk === "critical" ? "red" : risk === "write" ? "orange" : risk === "sensitive_read" ? "gold" : "default"
+                        }
+                      >
+                        {t(`tools.risk.${risk}`)}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: t("tools.columnPermissions"),
+                    dataIndex: "requiredPermissions",
+                    render: (value: string[]) =>
+                      value.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {value.map((permission) => (
+                            <Tag key={permission} className="font-mono text-[11px]">
+                              {permission}
+                            </Tag>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-zinc-600">—</span>
+                      ),
+                  },
+                  {
+                    title: t("tools.columnEnabled"),
+                    dataIndex: "enabled",
+                    width: 90,
+                    render: (enabled: boolean) =>
+                      enabled ? <Tag color="lime">{t("tools.columnEnabled")}</Tag> : <Tag>—</Tag>,
+                  },
+                ]}
+              />
+              {access.canAssignTools && access.canReadMcpServers ? (
+                <div className="mt-7 flex justify-end">
+                  <Button
+                    data-testid="save-agent-tools"
+                    type="primary"
+                    loading={savingSection === "tools"}
+                    onClick={() => void saveTools()}
+                  >
+                    {t("tools.save")}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ),
         }] : []),

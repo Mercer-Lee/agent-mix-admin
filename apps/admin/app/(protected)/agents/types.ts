@@ -113,6 +113,22 @@ export interface AgentInvocationAccessInput {
   departments: Array<{ departmentId: string; includeDescendants: boolean }>;
 }
 
+export interface AgentToolsState {
+  agentId: string;
+  toolIds: string[];
+}
+
+export interface McpToolOption {
+  id: string;
+  serverSlug: string;
+  serverName: string;
+  name: string;
+  description: string;
+  risk: "read" | "sensitive_read" | "write" | "critical";
+  requiredPermissions: string[];
+  enabled: boolean;
+}
+
 export interface AgentManagerAccess {
   canCreate: boolean;
   canUpdateProfile: boolean;
@@ -120,6 +136,8 @@ export interface AgentManagerAccess {
   canAssignPermissions: boolean;
   canConfigureRuntime: boolean;
   canAssignAccess: boolean;
+  canAssignTools: boolean;
+  canReadMcpServers: boolean;
   canReadUsers: boolean;
   canReadRoles: boolean;
   canReadDepartments: boolean;

@@ -70,6 +70,8 @@ export default async function AgentsPage({ searchParams }: AgentsPageProps) {
         canAssignPermissions,
         canConfigureRuntime: auth.permissions.includes("agents:configure-runtime") && canReadModels,
         canAssignAccess: auth.permissions.includes("agents:assign-access"),
+        canAssignTools: auth.permissions.includes("agents:assign-tools"),
+        canReadMcpServers: auth.permissions.includes("mcp-servers:read"),
         canReadUsers,
         canReadRoles,
         canReadDepartments,

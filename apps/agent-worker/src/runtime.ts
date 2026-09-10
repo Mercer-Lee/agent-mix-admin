@@ -13,15 +13,19 @@ import {
   type ModelCheckTaskV1,
   type ModelUsageV1,
   type RuntimeEventV1,
+  type RuntimeToolDescriptorV1,
   UsersSearchInputV1Schema,
+  UsersSearchOutputV1Schema,
 } from "@agentmix/core";
 import {
+  jsonSchema,
   stepCountIs,
   streamText,
   tool,
   type FinishReason,
   type LanguageModelUsage,
   type ModelMessage,
+  type ToolSet,
 } from "ai";
 import { CapabilityBridgeError, classifyRuntimeError } from "./safe-errors";
 
@@ -466,74 +470,22 @@ export class AgentRuntime {
       publisher.publish({ type: "text.delta", delta }),
     );
 
-    const usersSearch = tool({
-      description: "Search and paginate users that both the current user and Agent are authorized to read.",
-      inputSchema: UsersSearchInputV1Schema,
-      execute: async (input) => {
-        await deltaBatcher.flush();
-        const requestId = this.createId();
-        await publisher.publish({
-          type: "capability.started",
-          requestId,
-          capability: "users.search",
-        });
-        const request: CapabilityRequestV1 = {
-          version: 1,
-          kind: "capability.request",
-          requestId,
-          runId: task.runId,
-          conversationId: task.conversationId,
-          actorSubjectId: task.actorSubjectId,
-          agentSubjectId: task.agentSubjectId,
-          traceId: task.traceId,
-          capability: "users.search",
-          input,
-          requestedAt: new Date(this.now()).toISOString(),
-          deadlineAt: deadline.effectiveDeadlineAt,
-        };
-
-        let result: CapabilityResultV1;
-        try {
-          result = CapabilityResultV1Schema.parse(
-            await this.options.capabilities.execute(request, deadline.signal),
-          );
-        } catch {
-          await publisher.publish({
-            type: "capability.failed",
-            requestId,
-            capability: "users.search",
-            errorCode: "capability_failed",
-          });
-          throw new CapabilityBridgeError();
-        }
-
-        if (result.status === "failed") {
-          await publisher.publish({
-            type: "capability.failed",
-            requestId,
-            capability: "users.search",
-            errorCode: "capability_failed",
-          });
-          throw new CapabilityBridgeError();
-        }
-
-        await publisher.publish({
-          type: "capability.completed",
-          requestId,
-          capability: "users.search",
-          resultCount: result.output.items.length,
-          total: result.output.total,
-        });
-        return result.output;
-      },
-    });
+    const toolSet: ToolSet = {};
+    for (const descriptor of task.tools ?? []) {
+      toolSet[descriptor.name] = this.buildBridgeTool(task, descriptor, publisher, deadline, deltaBatcher);
+    }
+    if (Object.keys(toolSet).length === 0 && task.capabilities.includes("users.search")) {
+      // Pre-2A durable snapshots (and rolling upgrades) carry capabilities
+      // without descriptors; keep the vertical tool they may still invoke.
+      toolSet.users_search = this.buildLegacyUsersSearchTool(task, publisher, deadline, deltaBatcher);
+    }
 
     const messages: ModelMessage[] = task.messages.map(({ role, content }) => ({ role, content }));
     const result = streamText({
       model: this.options.provider(task.model.modelId),
       system: task.systemPrompt || undefined,
       messages,
-      tools: task.capabilities.includes("users.search") ? { users_search: usersSearch } : undefined,
+      tools: Object.keys(toolSet).length > 0 ? toolSet : undefined,
       temperature: task.generation.temperature,
       maxOutputTokens: task.generation.maxOutputTokens,
       stopWhen: stepCountIs(Math.min(5, task.generation.maxSteps)),
@@ -579,4 +531,159 @@ export class AgentRuntime {
     if (outputTruncated) finishReason = "length";
     return { text, finishReason, usage };
   }
+
+  /**
+   * Build the provider tool for one snapshot descriptor. Every call routes
+   * through the capability bridge back to the control plane, which owns
+   * authorization, schema validation, and audit.
+   */
+  private buildBridgeTool(
+    task: AgentRunTaskV1,
+    descriptor: RuntimeToolDescriptorV1,
+    publisher: RunEventPublisher,
+    deadline: DeadlineContext,
+    deltaBatcher: DeltaBatcher,
+  ) {
+    return tool({
+      description: descriptor.description,
+      // The control plane validates this input with the capability's own
+      // registered schema (Ajv for MCP tools), so the Worker deliberately skips
+      // client-side validation: no `validate` is passed, which makes the AI SDK
+      // forward the remote schema verbatim instead of re-deriving constraints.
+      inputSchema: jsonSchema(descriptor.inputSchema),
+      execute: async (input) => {
+        await deltaBatcher.flush();
+        const requestId = this.createId();
+        await publisher.publish({
+          type: "capability.started",
+          requestId,
+          capability: descriptor.id,
+        });
+        const request: CapabilityRequestV1 = {
+          version: 1,
+          kind: "capability.request",
+          requestId,
+          runId: task.runId,
+          conversationId: task.conversationId,
+          actorSubjectId: task.actorSubjectId,
+          agentSubjectId: task.agentSubjectId,
+          traceId: task.traceId,
+          capability: descriptor.id,
+          input: input as CapabilityRequestV1["input"],
+          requestedAt: new Date(this.now()).toISOString(),
+          deadlineAt: deadline.effectiveDeadlineAt,
+        };
+
+        const result = await this.requestCapability(request, descriptor.id, publisher, deadline);
+        if (result.status === "failed") throw new CapabilityBridgeError();
+        await publisher.publish({
+          type: "capability.completed",
+          requestId,
+          capability: descriptor.id,
+          ...capabilityCompletionMetrics(descriptor.id, result.output),
+        });
+        return result.output;
+      },
+    });
+  }
+
+  /** Pre-2A snapshot compat: the users.search vertical with its typed contract. */
+  private buildLegacyUsersSearchTool(
+    task: AgentRunTaskV1,
+    publisher: RunEventPublisher,
+    deadline: DeadlineContext,
+    deltaBatcher: DeltaBatcher,
+  ) {
+    return tool({
+      description: "Search and paginate users that both the current user and Agent are authorized to read.",
+      inputSchema: UsersSearchInputV1Schema,
+      execute: async (input) => {
+        await deltaBatcher.flush();
+        const requestId = this.createId();
+        await publisher.publish({
+          type: "capability.started",
+          requestId,
+          capability: "users.search",
+        });
+        const request: CapabilityRequestV1 = {
+          version: 1,
+          kind: "capability.request",
+          requestId,
+          runId: task.runId,
+          conversationId: task.conversationId,
+          actorSubjectId: task.actorSubjectId,
+          agentSubjectId: task.agentSubjectId,
+          traceId: task.traceId,
+          capability: "users.search",
+          input,
+          requestedAt: new Date(this.now()).toISOString(),
+          deadlineAt: deadline.effectiveDeadlineAt,
+        };
+
+        const result = await this.requestCapability(request, "users.search", publisher, deadline);
+        if (result.status === "failed") throw new CapabilityBridgeError();
+        // The contract union admits generic JSON; the vertical keeps its typed
+        // output, so re-validate before the typed field access below.
+        const output = UsersSearchOutputV1Schema.parse(result.output);
+        await publisher.publish({
+          type: "capability.completed",
+          requestId,
+          capability: "users.search",
+          resultCount: output.items.length,
+          total: output.total,
+        });
+        return output;
+      },
+    });
+  }
+
+  private async requestCapability(
+    request: CapabilityRequestV1,
+    capabilityId: string,
+    publisher: RunEventPublisher,
+    deadline: DeadlineContext,
+  ): Promise<CapabilityResultV1> {
+    try {
+      return CapabilityResultV1Schema.parse(
+        await this.options.capabilities.execute(request, deadline.signal),
+      );
+    } catch {
+      await publisher.publish({
+        type: "capability.failed",
+        requestId: request.requestId,
+        capability: capabilityId,
+        errorCode: "capability_failed",
+      });
+      throw new CapabilityBridgeError();
+    }
+  }
+}
+
+/**
+ * Result metrics for a `capability.completed` event. The vertical users.search
+ * reports its pagination counts; a generic (MCP) output has no agreed shape, so
+ * a list reports its length and any other value counts as the one result the
+ * call produced — never 0, which would read as "the tool found nothing".
+ */
+function capabilityCompletionMetrics(
+  capabilityId: string,
+  output: unknown,
+): { resultCount: number; total: number } {
+  if (
+    capabilityId === "users.search" &&
+    output &&
+    typeof output === "object" &&
+    !Array.isArray(output) &&
+    "items" in output &&
+    "total" in output
+  ) {
+    const items = (output as { items: unknown }).items;
+    const total = (output as { total: unknown }).total;
+    return {
+      resultCount: Array.isArray(items) ? items.length : 0,
+      total: typeof total === "number" ? total : 0,
+    };
+  }
+  const count = Array.isArray(output) ? output.length : 1;
+  return { resultCount: count, total: count };
 }

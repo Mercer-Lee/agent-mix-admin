@@ -1,10 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   AGENT_RUN_CANCEL_OUTBOX_TOPIC,
+  AGENT_RUN_MAX_TOOLS,
   AgentRunEventV1Schema,
   AgentRunControlV1Schema,
   AgentRunTaskV1Schema,
   type AgentRunTaskV1,
+  deriveProviderToolName,
+  type CapabilityDescriptor,
+  type RuntimeToolDescriptorV1,
 } from "@agentmix/core";
 import {
   ConflictException,
@@ -21,13 +25,18 @@ import {
   agentRunEvents,
   agentRuns,
   agentRuntimes,
+  agentToolBindings,
   agents,
   conversationMessages,
   conversations,
+  mcpServers,
+  mcpTools,
   modelProfiles,
   outboxEvents,
   subjects,
 } from "../database/schema";
+import { buildUsersSearchToolDescriptor, USERS_SEARCH_TOOL_ID } from "../capabilities/tool-descriptors";
+import { deriveMcpCapabilityId, MCP_MODULE_PREFIX } from "../mcp/mcp.tooling";
 import { RuntimeService } from "../runtime/runtime.service";
 
 interface ActorMetadata {
@@ -43,7 +52,8 @@ type RuntimeSnapshot = {
   temperature: number;
   maxOutputTokens: number;
   maxSteps: number;
-  capabilities: Array<"users.search">;
+  capabilities: string[];
+  tools: RuntimeToolDescriptorV1[];
 };
 
 const ACTIVE_STATUSES = ["queued", "running"] as const;
@@ -669,6 +679,7 @@ export class ConversationsService {
       agentSubjectId,
       traceId: randomUUID(),
     });
+    const tools = await this.resolveSnapshotTools(descriptors, agentSubjectId);
     return {
       agent: { id: row.agentId, slug: row.slug, name: row.name, description: row.description },
       profile: { id: row.profileId, key: row.profileKey, modelId: row.modelId },
@@ -676,10 +687,78 @@ export class ConversationsService {
       temperature: row.temperature,
       maxOutputTokens: row.maxOutputTokens,
       maxSteps: row.maxSteps,
-      capabilities: descriptors.some((descriptor) => descriptor.id === "users.search")
-        ? ["users.search"]
-        : [],
+      capabilities: tools.map((tool) => tool.id),
+      tools,
     };
+  }
+
+  /**
+   * The model-facing tool set: internal capabilities the actor and agent are
+   * both authorized for, plus bound MCP tools (enabled, on an active server,
+   * and dual-authorized via the same capability surface). Binding decides
+   * intent; authorization decides availability; both must hold per run.
+   *
+   * MCP tools are named by a provider-safe derivative of their capability id
+   * rather than the bare remote tool name: two servers routinely expose the
+   * same tool name ("search"), and the Worker keys its provider tool set by
+   * this name, so a bare name would let one server's tool silently shadow
+   * another's. See deriveProviderToolName — the id stays the governed identity
+   * used by events and audit rows.
+   */
+  private async resolveSnapshotTools(
+    descriptors: CapabilityDescriptor[],
+    agentSubjectId: string,
+  ): Promise<RuntimeToolDescriptorV1[]> {
+    const internalTools: RuntimeToolDescriptorV1[] = [];
+    const mcpDescriptors: RuntimeToolDescriptorV1[] = [];
+    let hasUsersSearch = false;
+    for (const descriptor of descriptors) {
+      if (descriptor.id === USERS_SEARCH_TOOL_ID) {
+        hasUsersSearch = true;
+        continue;
+      }
+      if (!descriptor.id.startsWith(MCP_MODULE_PREFIX)) continue;
+      mcpDescriptors.push({
+        id: descriptor.id,
+        name: deriveProviderToolName(descriptor.id),
+        description: descriptor.description,
+        inputSchema: descriptor.inputSchema,
+      });
+    }
+    if (hasUsersSearch) internalTools.push(buildUsersSearchToolDescriptor());
+
+    const boundIds = await this.resolveBoundToolCapabilityIds(agentSubjectId);
+    const selectedMcpTools = mcpDescriptors.filter((tool) => boundIds.has(tool.id));
+    // mcp-* sorts before users.search, so the internal vertical is never the
+    // one silently dropped when the cap is reached.
+    const maxMcpTools = Math.max(0, AGENT_RUN_MAX_TOOLS - internalTools.length);
+    const tools = [
+      ...selectedMcpTools.slice(0, maxMcpTools),
+      ...internalTools,
+    ];
+    tools.sort((left, right) => left.id.localeCompare(right.id));
+    return tools;
+  }
+
+  private async resolveBoundToolCapabilityIds(agentSubjectId: string): Promise<Set<string>> {
+    const rows = await this.database.db
+      .select({ toolName: mcpTools.name, serverSlug: mcpServers.slug })
+      .from(agentToolBindings)
+      .innerJoin(mcpTools, eq(agentToolBindings.toolId, mcpTools.id))
+      .innerJoin(mcpServers, eq(mcpTools.serverId, mcpServers.id))
+      .where(
+        and(
+          eq(agentToolBindings.agentSubjectId, agentSubjectId),
+          eq(mcpTools.enabled, true),
+          eq(mcpServers.status, "active"),
+        ),
+      );
+    const ids = new Set<string>();
+    for (const row of rows) {
+      const id = deriveMcpCapabilityId(row.serverSlug, row.toolName);
+      if (id) ids.add(id);
+    }
+    return ids;
   }
 
   private buildTask(input: {
@@ -712,6 +791,7 @@ export class ConversationsService {
       systemPrompt: input.snapshot.systemPrompt,
       messages: input.messages,
       capabilities: input.snapshot.capabilities,
+      tools: input.snapshot.tools,
       createdAt: input.now.toISOString(),
       deadlineAt: new Date(input.now.getTime() + 120_000).toISOString(),
     });

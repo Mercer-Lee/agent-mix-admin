@@ -15,8 +15,10 @@ import {
   agentDepartmentAccessGrants,
   agentRoleAccessGrants,
   agentRuntimes,
+  agentToolBindings,
   agentUserAccessGrants,
   departments,
+  mcpTools,
   modelProfiles,
   permissions,
   roles,
@@ -277,6 +279,55 @@ export class AgentsService {
           resourceId: agentId,
           outcome: "success",
           metadata: { permissionIds },
+        },
+        tx,
+      );
+    });
+  }
+
+  async getTools(agentId: string) {
+    await this.getById(agentId);
+    const rows = await this.database.db
+      .select({ id: agentToolBindings.toolId })
+      .from(agentToolBindings)
+      .where(eq(agentToolBindings.agentSubjectId, agentId))
+      .orderBy(agentToolBindings.toolId);
+    return { agentId, toolIds: rows.map((row) => row.id) };
+  }
+
+  async replaceTools(agentId: string, toolIds: string[], actor: ActorMetadata): Promise<void> {
+    if (new Set(toolIds).size !== toolIds.length) {
+      throw new BadRequestException("Duplicate tool binding");
+    }
+    await this.database.db.transaction(async (tx) => {
+      await this.ensureAgent(tx, agentId);
+      if (toolIds.length) {
+        const validTools = await tx
+          .select({ id: mcpTools.id })
+          .from(mcpTools)
+          .where(and(inArray(mcpTools.id, toolIds), eq(mcpTools.enabled, true)));
+        if (validTools.length !== toolIds.length) {
+          throw new BadRequestException("Tool bindings may only reference enabled MCP tools");
+        }
+      }
+      await tx.delete(agentToolBindings).where(eq(agentToolBindings.agentSubjectId, agentId));
+      if (toolIds.length) {
+        await tx.insert(agentToolBindings).values(
+          toolIds.map((toolId) => ({
+            agentSubjectId: agentId,
+            toolId,
+            createdBySubjectId: actor.actorSubjectId,
+          })),
+        );
+      }
+      await this.audit.record(
+        {
+          ...actor,
+          action: "agent.tools.updated",
+          resourceType: "agent",
+          resourceId: agentId,
+          outcome: "success",
+          metadata: { toolIds },
         },
         tx,
       );

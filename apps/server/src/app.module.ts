@@ -18,6 +18,7 @@ import { AgentsModule } from "./agents/agents.module";
 import { PermissionsModule } from "./permissions/permissions.module";
 import { RuntimeModule } from "./runtime/runtime.module";
 import { ModelsModule } from "./models/models.module";
+import { McpModule } from "./mcp/mcp.module";
 import { DepartmentsModule } from "./departments/departments.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { SafeExceptionFilter } from "./safe-exception.filter";
@@ -41,6 +42,7 @@ import { SafeExceptionFilter } from "./safe-exception.filter";
     UsersModule,
     RolesModule,
     ModelsModule,
+    McpModule,
     DepartmentsModule,
     ConversationsModule,
   ],

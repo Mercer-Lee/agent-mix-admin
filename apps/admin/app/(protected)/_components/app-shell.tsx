@@ -9,6 +9,7 @@ import {
   MenuUnfoldOutlined,
   MessageOutlined,
   RobotOutlined,
+  ToolOutlined,
 } from "@ant-design/icons";
 import { Button, Drawer, Grid, Layout, Menu } from "antd";
 import type { MenuProps } from "antd";
@@ -19,7 +20,7 @@ import { useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { LogoutButton } from "../logout-button";
 
-export type AppNavKey = "overview" | "models" | "agents" | "workbench" | "audit";
+export type AppNavKey = "overview" | "models" | "tools" | "agents" | "workbench" | "audit";
 
 export interface AppNavItem {
   key: AppNavKey;
@@ -36,6 +37,7 @@ interface AppShellProps {
 const NAV_ICONS: Record<AppNavKey, ComponentType> = {
   overview: DashboardOutlined,
   models: DatabaseOutlined,
+  tools: ToolOutlined,
   agents: RobotOutlined,
   workbench: MessageOutlined,
   audit: FileSearchOutlined,
