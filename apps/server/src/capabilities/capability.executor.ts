@@ -10,6 +10,7 @@ import { AuditService } from "../audit/audit.service";
 import { AuthorizationService } from "../rbac/authorization.service";
 import type { AnyRegisteredCapability } from "./capability.types";
 import { CapabilityRegistry } from "./capability.registry";
+import { CapabilityResolver } from "./capability.resolver";
 
 interface AuthorizationResult {
   actorPermissions: string[] | null;
@@ -22,6 +23,7 @@ export class CapabilityExecutor {
     private readonly registry: CapabilityRegistry,
     private readonly authorization: AuthorizationService,
     private readonly audit: AuditService,
+    private readonly resolver: CapabilityResolver,
   ) {}
 
   async listAvailable(context: CapabilityExecutionContext): Promise<CapabilityDescriptor[]> {
@@ -44,7 +46,10 @@ export class CapabilityExecutor {
     context: CapabilityExecutionContext,
   ): Promise<unknown> {
     const parsedContext = this.parseContext(context);
-    const capability = this.registry.get(id);
+    // Resolved rather than read straight from the registry: a capability
+    // request is served by whichever instance consumes it from the shared
+    // queue, which may not be the instance that warmed the registry at boot.
+    const capability = await this.resolver.resolve(id);
     if (!capability) {
       await this.recordFailure(id, parsedContext, "CAPABILITY_NOT_FOUND");
       throw new CapabilityError("CAPABILITY_NOT_FOUND", `Capability "${id}" was not found`);

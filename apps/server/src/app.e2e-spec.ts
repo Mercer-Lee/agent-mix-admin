@@ -25,6 +25,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AuditService } from "./audit/audit.service";
+import { McpService } from "./mcp/mcp.service";
 import { DatabaseService } from "./database/database.service";
 import { seedDatabase } from "./database/seed-data";
 import {
@@ -57,6 +58,7 @@ import { ModelsService } from "./models/models.service";
 import { RuntimeService } from "./runtime/runtime.service";
 import { UsersService } from "./users/users.service";
 import { CapabilityExecutor } from "./capabilities/capability.executor";
+import { CapabilityRegistry } from "./capabilities/capability.registry";
 import { startWorker, type RunningWorker } from "../../agent-worker/src/bullmq-runtime";
 
 process.env.TESTCONTAINERS_RYUK_DISABLED = "true";
@@ -175,6 +177,8 @@ describe("Phase 1C governed runtime", () => {
   let container: StartedPostgreSqlContainer;
   let redisContainer: StartedTestContainer;
   let app: INestApplication;
+  /** Kept so a case can boot a second control-plane instance on the same queue. */
+  let controlPlaneModule: (typeof import("./app.module"))["AppModule"];
   let database: DatabaseService;
   let runtimeWorker: RunningWorker;
   let fakeProvider: ReturnType<typeof createServer>;
@@ -206,6 +210,7 @@ describe("Phase 1C governed runtime", () => {
     await migrationPool.end();
 
     const { AppModule } = await import("./app.module");
+    controlPlaneModule = AppModule;
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication();
     app
@@ -2612,7 +2617,14 @@ describe("Phase 1C governed runtime", () => {
         .get(`/api/mcp/servers/${serverCreated.body.id}/tools`)
         .expect(200);
       const tool = toolList.body.items.find((item: { name: string }) => item.name === "get_workspace_info");
-      expect(tool).toMatchObject({ enabled: false, risk: "read", requiredPermissions: [] });
+      // A freshly discovered tool is disabled, so availability is the admin's
+      // own switch rather than a missing precondition.
+      expect(tool).toMatchObject({
+        enabled: false,
+        risk: "read",
+        requiredPermissions: [],
+        activation: "disabled",
+      });
 
       await admin
         .put(`/api/mcp/tools/${tool.id}`)
@@ -2624,11 +2636,95 @@ describe("Phase 1C governed runtime", () => {
         .set("origin", "http://localhost:3100")
         .send({ requiredPermissions: ["definitely:not-a-permission"], enabled: true })
         .expect(409);
-      await admin
+      const enabled = await admin
         .put(`/api/mcp/tools/${tool.id}`)
         .set("origin", "http://localhost:3100")
         .send({ requiredPermissions: ["users:read"], risk: "read", enabled: true })
         .expect(200);
+      // Enabled *and* registered: the only state a governed run can call.
+      expect(enabled.body).toMatchObject({ enabled: true, activation: "registered" });
+
+      // A second control-plane replica, booted while the tool was disabled, so it
+      // never registered it. Capability requests are consumed from a shared queue
+      // by whichever replica picks them up, so this replica must still be able to
+      // serve the tool it never registered: that is what lazy resolution buys,
+      // and what made this a per-replica lottery before.
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ status: "disabled" })
+        .expect(200);
+      const staleModule = await Test.createTestingModule({
+        imports: [controlPlaneModule],
+      }).compile();
+      const staleApp = staleModule.createNestApplication();
+      staleApp.setGlobalPrefix("api");
+      await staleApp.init();
+      // Only the live instance learns the tool came back.
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ status: "active" })
+        .expect(200);
+      const adminSubject = await database.db
+        .select({ id: users.subjectId })
+        .from(users)
+        .where(eq(users.username, "admin"))
+        .limit(1);
+      const assistantSubject = await database.db
+        .select({ id: agents.subjectId })
+        .from(agents)
+        .where(eq(agents.slug, "agentmix-assistant"))
+        .limit(1);
+      try {
+        const capabilityId = "mcp-integration-mcp.get_workspace_info";
+        // Booted stale: the capability is absent from this replica's registry...
+        expect(staleApp.get(CapabilityRegistry).get(capabilityId)).toBeUndefined();
+        // ...yet a capability request routed to it still resolves from the
+        // database and executes, so availability cannot depend on which
+        // replica consumed the request.
+        const executed = await staleApp.get(CapabilityExecutor).execute(
+          capabilityId,
+          { workspace: "acme" },
+          {
+            actorSubjectId: adminSubject[0]!.id,
+            agentSubjectId: assistantSubject[0]!.id,
+            traceId: randomUUID(),
+            conversationId: randomUUID(),
+          },
+        );
+        expect(executed).toMatchObject({ workspace: "acme", members: 3 });
+        // Served by the MCP server through the stale replica's own connection.
+        expect(mcpCalls).toHaveLength(1);
+      } finally {
+        await staleApp.close();
+      }
+
+      // Disabling the server must demote its still-enabled tools, so the admin
+      // surface explains the loss instead of showing a silently dead tool.
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ status: "disabled" })
+        .expect(200);
+      const afterServerDisabled = await admin
+        .get(`/api/mcp/servers/${serverCreated.body.id}/tools`)
+        .expect(200);
+      expect(
+        afterServerDisabled.body.items.find((item: { id: string }) => item.id === tool.id),
+      ).toMatchObject({ enabled: true, activation: "server_disabled" });
+      // Restore the server for the rest of the scenario.
+      await admin
+        .put(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .send({ status: "active" })
+        .expect(200);
+      const afterServerRestored = await admin
+        .get(`/api/mcp/servers/${serverCreated.body.id}/tools`)
+        .expect(200);
+      expect(
+        afterServerRestored.body.items.find((item: { id: string }) => item.id === tool.id),
+      ).toMatchObject({ enabled: true, activation: "registered" });
 
       const available = await admin.get("/api/chat/agents").expect(200);
       const assistant = available.body.items.find(
@@ -2669,7 +2765,8 @@ describe("Phase 1C governed runtime", () => {
         assistantMessage: { content: "Found the governed administrator account." },
       });
 
-      expect(mcpCalls).toHaveLength(1);
+      // One call from the run above, one from the stale-replica probe.
+      expect(mcpCalls).toHaveLength(2);
       expect(mcpCalls[0]).toMatchObject({
         workspace: "acme",
         authorization: process.env.MCP_E2E_TOKEN,
@@ -2734,7 +2831,8 @@ describe("Phase 1C governed runtime", () => {
           revokedRun = (await admin.get(`/api/runs/${revokedRun.id}`).expect(200)).body;
         }
         expect(revokedRun).toMatchObject({ status: "failed", errorCode: "capability_failed" });
-        expect(mcpCalls).toHaveLength(1);
+        // Revocation happens mid-run, so the call never reaches the MCP server.
+        expect(mcpCalls).toHaveLength(2);
       } finally {
         revocationGate.allow();
         capabilityGate = null;
@@ -2744,6 +2842,54 @@ describe("Phase 1C governed runtime", () => {
             .values({ subjectId: assistant.id, permissionId: usersReadPermission[0]!.id })
             .onConflictDoNothing();
         }
+      }
+
+      // A replica that cached this capability must stop serving it once the tool
+      // is disabled: execution authorizes against the manifest, so a stale cache
+      // would fail open with the pre-disable permissions.
+      const revocationApp = (
+        await Test.createTestingModule({ imports: [controlPlaneModule] }).compile()
+      ).createNestApplication();
+      revocationApp.setGlobalPrefix("api");
+      await revocationApp.init();
+      const capabilityId = "mcp-integration-mcp.get_workspace_info";
+      const executionContext = {
+        actorSubjectId: adminSubject[0]!.id,
+        agentSubjectId: assistantSubject[0]!.id,
+        traceId: randomUUID(),
+        conversationId: randomUUID(),
+      };
+      try {
+        const revokedRegistry = revocationApp.get(CapabilityRegistry);
+        // Warm this replica's cache through a real execution, so the refusal
+        // below has to come from the source rather than from a cold cache...
+        await expect(
+          revocationApp
+            .get(CapabilityExecutor)
+            .execute(capabilityId, { workspace: "acme" }, executionContext),
+        ).resolves.toMatchObject({ workspace: "acme" });
+        expect(revokedRegistry.get(capabilityId)).toBeDefined();
+
+        // ...then disable the tool and confirm the cached replica refuses it.
+        await admin
+          .put(`/api/mcp/tools/${tool.id}`)
+          .set("origin", "http://localhost:3100")
+          .send({ enabled: false })
+          .expect(200);
+        await expect(
+          revocationApp
+            .get(CapabilityExecutor)
+            .execute(capabilityId, { workspace: "acme" }, executionContext),
+        ).rejects.toMatchObject({ code: "CAPABILITY_NOT_FOUND" });
+        // The MCP server never saw the refused call.
+        expect(mcpCalls).toHaveLength(3);
+      } finally {
+        await revocationApp.close();
+        await admin
+          .put(`/api/mcp/tools/${tool.id}`)
+          .set("origin", "http://localhost:3100")
+          .send({ enabled: true, requiredPermissions: ["users:read"] })
+          .expect(200);
       }
 
       // clearAuth is the only way to remove the pair, and it takes effect.
@@ -2768,6 +2914,94 @@ describe("Phase 1C governed runtime", () => {
         /^MCP tool sync failed \((?:CONNECT_FAILED|PROTOCOL_ERROR|TIMEOUT)\)$/,
       );
       expect(JSON.stringify(unauthenticatedSync.body)).not.toContain(process.env.MCP_E2E_TOKEN!);
+
+      // Last, because deleting a permission cascades its subject grants (the FK
+      // behaviour the revocation probe above also relies on). A tool whose
+      // required permission vanished from the catalog is enabled but can no
+      // longer be registered; the admin surface has to say why instead of
+      // presenting a tool that can never reach the model.
+      const catalogPermission = await database.db
+        .select({
+          id: permissions.id,
+          resource: permissions.resource,
+          action: permissions.action,
+          description: permissions.description,
+        })
+        .from(permissions)
+        .where(and(eq(permissions.resource, "users"), eq(permissions.action, "read")))
+        .limit(1);
+      const grantsToRestore = await database.db
+        .select({
+          subjectId: subjectPermissions.subjectId,
+          permissionId: subjectPermissions.permissionId,
+        })
+        .from(subjectPermissions)
+        .where(eq(subjectPermissions.permissionId, catalogPermission[0]!.id));
+      const removedPermission = await database.db
+        .delete(permissions)
+        .where(eq(permissions.id, catalogPermission[0]!.id))
+        .returning({
+          resource: permissions.resource,
+          action: permissions.action,
+          description: permissions.description,
+        });
+      try {
+        await app.get(McpService).onApplicationBootstrap();
+        const afterPermissionRemoved = await admin
+          .get(`/api/mcp/servers/${serverCreated.body.id}/tools`)
+          .expect(200);
+        expect(
+          afterPermissionRemoved.body.items.find((item: { id: string }) => item.id === tool.id),
+        ).toMatchObject({ enabled: true, activation: "unknown_permissions" });
+      } finally {
+        const removedRow = removedPermission[0]!;
+        const restored = await database.db
+          .insert(permissions)
+          .values({
+            resource: removedRow.resource,
+            action: removedRow.action,
+            description: removedRow.description,
+          })
+          .returning({ id: permissions.id });
+        if (grantsToRestore.length && restored[0]) {
+          await database.db
+            .insert(subjectPermissions)
+            .values(
+              grantsToRestore.map((grant) => ({
+                subjectId: grant.subjectId,
+                permissionId: restored[0]!.id,
+              })),
+            )
+            .onConflictDoNothing();
+        }
+        await app.get(McpService).onApplicationBootstrap();
+      }
+      const afterPermissionRestored = await admin
+        .get(`/api/mcp/servers/${serverCreated.body.id}/tools`)
+        .expect(200);
+      expect(
+        afterPermissionRestored.body.items.find((item: { id: string }) => item.id === tool.id),
+      ).toMatchObject({ enabled: true, activation: "registered" });
+
+      // Last of all, deletion — the one mutation whose rows vanish entirely. The
+      // slug is only readable inside the deleting transaction, and once the rows
+      // are gone nothing but the reserved mcp- prefix stands between a cached
+      // definition and fail-open execution. This instance's registry entry must
+      // be evicted, and the id must stay refused rather than resolve from the
+      // cache (before the eviction fix, the entry silently survived here).
+      expect(app.get(CapabilityRegistry).get(capabilityId)).toBeDefined();
+      await admin
+        .delete(`/api/mcp/servers/${serverCreated.body.id}`)
+        .set("origin", "http://localhost:3100")
+        .expect(200);
+      expect(app.get(CapabilityRegistry).get(capabilityId)).toBeUndefined();
+      await expect(
+        app
+          .get(CapabilityExecutor)
+          .execute(capabilityId, { workspace: "acme" }, executionContext),
+      ).rejects.toMatchObject({ code: "CAPABILITY_NOT_FOUND" });
+      // The refused call never reached the MCP server.
+      expect(mcpCalls).toHaveLength(3);
     } catch (testError) {
       console.log("MCP-TEST-ERROR", testError);
       throw testError;

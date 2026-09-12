@@ -240,6 +240,34 @@ describe("Phase 2A MCP tool contracts", () => {
     ).toBe(false);
   });
 
+  it("publishes the same invocable set in capabilities and tools", () => {
+    // RuntimeService authorizes every incoming capability request against the
+    // run snapshot, and the Worker builds its provider tool set from `tools`.
+    // The two must describe one set: a snapshot allowed to advertise more than
+    // it hands the model would authorize calls the model could not have made,
+    // and advertising less would reject legitimate MCP tool calls.
+    const published = {
+      ...validRunTask(),
+      capabilities: ["users.search", "mcp-docs.search_docs"],
+      tools: [
+        {
+          id: "users.search",
+          name: "users_search",
+          description: "Search governed users.",
+          inputSchema: { type: "object", properties: {} },
+        },
+        {
+          id: "mcp-docs.search_docs",
+          name: "search_docs-926677e1",
+          description: "Search the handbook.",
+          inputSchema: { type: "object", properties: { query: { type: "string" } } },
+        },
+      ],
+    };
+    const task = AgentRunTaskV1Schema.parse(published);
+    expect(task.capabilities).toEqual(task.tools?.map((tool) => tool.id));
+  });
+
   it("derives provider-safe, unique tool names for capability ids", () => {
     // A capability id always carries the module separator, which providers
     // reject, so even a short id is rewritten into a clean function name.

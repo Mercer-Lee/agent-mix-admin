@@ -70,10 +70,13 @@
   },
   "toolDrawer": {
     "title": "Tools / {name}",
-    "discoveryHint": "New tools arrive disabled with no permissions. Assign required permissions before enabling, then bind tools to agents on the agent page."
+    "discoveryHint": "New tools arrive disabled with no permissions. Assign required permissions before enabling, then bind tools to agents on the agent page.",
+    "unusableTitle": "{count} of {total} tools are enabled but not registered",
+    "unusableDetail": "Enabled is only intent. A tool reaches the model once its capability is registered; until then any agent bound to it simply loses that tool."
   },
   "toolTable": {
     "tool": "Tool",
+    "riskLevel": "Risk",
     "noDescription": "No description",
     "risk": {
       "read": "Read",
@@ -83,7 +86,25 @@
     },
     "permissions": "Required permissions",
     "noPermissions": "None assigned",
-    "enabled": "Enabled"
+    "enabled": "Enabled",
+    "availability": "Availability",
+    "activation": {
+      "registered": "Registered",
+      "disabled": "Disabled",
+      "server_disabled": "Server disabled",
+      "invalid_capability_id": "Invalid name",
+      "permissions_required": "Permissions required",
+      "unknown_permissions": "Unknown permissions",
+      "registration_pending": "Not registered yet"
+    },
+    "activationHint": {
+      "server_disabled": "The parent MCP server is disabled, so governed runs cannot call this tool.",
+      "invalid_capability_id": "This tool name cannot form a governed capability id, so it is never exposed to the model.",
+      "permissions_required": "Assign at least one required permission before this tool can be enabled.",
+      "unknown_permissions": "A required permission no longer exists in the permission catalog; re-save the permissions to register this tool.",
+      "registration_pending": "Not loaded on this control-plane instance yet. It resolves on demand, so the next tool call registers it; a sync or restart also refreshes it.",
+      "registered": "Registered on this control-plane instance: a governed run served by it can call this tool."
+    }
   },
   "actions": {
     "forbidden": "You do not have permission to manage the MCP tool registry.",

@@ -36,6 +36,34 @@ export type McpToolRejectionReason = "TOOL_NAME_INVALID" | "TOOL_NAME_CONFLICT";
 
 export type McpSyncErrorCode = (typeof MCP_SYNC_ERROR_CODES)[number];
 
+/**
+ * Why an MCP tool is (not) callable by governed runs. `enabled` alone is intent,
+ * not availability: a tool is only exposed to the model once the control plane
+ * has registered its capability, which additionally requires an active server, a
+ * derivable capability id, and known required permissions.
+ *
+ * "registered" is the only usable state. "disabled" is the admin's own switch;
+ * every other value means the tool is enabled but silently unusable, which the
+ * admin surface reports.
+ */
+export const MCP_TOOL_ACTIVATION_STATES = [
+  "registered",
+  "disabled",
+  "server_disabled",
+  "invalid_capability_id",
+  "permissions_required",
+  "unknown_permissions",
+  "registration_pending",
+] as const;
+
+export type McpToolActivationState = (typeof MCP_TOOL_ACTIVATION_STATES)[number];
+
+/** Activation states that explain why an *enabled* tool cannot be called. */
+export type McpToolUnavailableReason = Exclude<
+  McpToolActivationState,
+  "registered" | "disabled"
+>;
+
 export function deriveMcpCapabilityId(serverSlug: string, toolName: string): string | null {
   const id = `${MCP_MODULE_PREFIX}${serverSlug}.${toolName.toLowerCase()}`;
   return CAPABILITY_ID_PATTERN.test(id) ? id : null;
@@ -43,6 +71,18 @@ export function deriveMcpCapabilityId(serverSlug: string, toolName: string): str
 
 export function deriveMcpModule(serverSlug: string): string {
   return `${MCP_MODULE_PREFIX}${serverSlug}`;
+}
+
+/**
+ * Whether an id sits in the namespace this module reserves for MCP-derived
+ * capabilities (`mcp-<slug>.<tool>`). Claimed without consulting the database
+ * on purpose: the claim must survive the deletion of every backing row, which
+ * is exactly when a cached definition would otherwise slip through the
+ * resolver's registry fallback. Code-defined capability ids do not use the
+ * prefix — it belongs to this module alone.
+ */
+export function claimsMcpCapabilityNamespace(capabilityId: string): boolean {
+  return capabilityId.startsWith(MCP_MODULE_PREFIX);
 }
 
 /**

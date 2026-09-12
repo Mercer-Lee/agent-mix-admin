@@ -19,6 +19,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   type TableProps,
 } from "antd";
 import { useTranslations } from "next-intl";
@@ -37,6 +38,7 @@ import type {
   McpServerListResponse,
   McpServerUpdateInput,
   McpTool,
+  McpToolActivation,
   McpToolListResponse,
   McpToolMutationInput,
   McpToolRisk,
@@ -230,6 +232,12 @@ export function ToolsManager({ initialData, access }: ToolsManagerProps) {
     router.refresh();
   }
 
+  // Enabled tools that a governed run still cannot call: the model never sees
+  // them, so an agent bound to one silently loses that tool.
+  const unusableTools = tools.filter(
+    (tool) => tool.activation !== "registered" && tool.activation !== "disabled",
+  );
+
   const columns: TableProps<McpServer>["columns"] = [
     {
       title: t("table.server"),
@@ -336,7 +344,9 @@ export function ToolsManager({ initialData, access }: ToolsManagerProps) {
       ),
     },
     {
-      title: t("toolTable.risk"),
+      // A dedicated key: `toolTable.risk` is a namespace of per-level labels, so
+      // it can never resolve as a plain string.
+      title: t("toolTable.riskLevel"),
       dataIndex: "risk",
       width: 130,
       render: (risk: McpToolRisk, tool) =>
@@ -353,6 +363,26 @@ export function ToolsManager({ initialData, access }: ToolsManagerProps) {
           />
         ) : (
           <Tag color={RISK_TAG_COLOR[risk]}>{t(`toolTable.risk.${risk}`)}</Tag>
+        ),
+    },
+    {
+      title: t("toolTable.availability"),
+      dataIndex: "activation",
+      width: 150,
+      // `enabled` is admin intent; this is whether a run can actually call it.
+      render: (activation: McpToolActivation) =>
+        activation === "registered" ? (
+          <Tag color="lime" data-testid="tool-availability-registered">
+            {t("toolTable.activation.registered")}
+          </Tag>
+        ) : activation === "disabled" ? (
+          <span className="text-xs text-zinc-600">{t("toolTable.activation.disabled")}</span>
+        ) : (
+          <Tooltip title={t(`toolTable.activationHint.${activation}`)}>
+            <Tag color="warning" data-testid={`tool-availability-${activation}`}>
+              {t(`toolTable.activation.${activation}`)}
+            </Tag>
+          </Tooltip>
         ),
     },
     {
@@ -556,6 +586,16 @@ export function ToolsManager({ initialData, access }: ToolsManagerProps) {
         onClose={() => setToolsFor(null)}
       >
         <Alert className="mb-5" type="info" showIcon title={t("toolDrawer.discoveryHint")} />
+        {unusableTools.length ? (
+          <Alert
+            className="mb-5"
+            type="warning"
+            showIcon
+            data-testid="tools-unusable-warning"
+            title={t("toolDrawer.unusableTitle", { count: unusableTools.length, total: tools.length })}
+            description={t("toolDrawer.unusableDetail")}
+          />
+        ) : null}
         <Table<McpTool>
           rowKey="id"
           size="small"

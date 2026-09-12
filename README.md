@@ -50,6 +50,8 @@ The Worker never reads PostgreSQL or calls Server HTTP, and the Server never cal
 
 Phase 2A is complete: an MCP tool registry (Streamable HTTP) in the control plane discovers and governs tools with risk levels and required permissions, agents bind tools through a dedicated permission, and the Worker builds provider tools from immutable snapshot descriptors — every tool call still flows back through the governed capability bridge for dual RBAC and audit. Approval flows and versioned Agent releases remain Phase 2B/2C work.
 
+**Upgrading across Phase 2A — upgrade the Worker first, then the Server.** The run-snapshot contract is `.strict()`: a pre-Phase-2A Worker's schema has no `tools` key, so it rejects *any* snapshot from the new control plane. Because it also cannot parse that payload, it cannot emit a terminal event, and the in-flight run is only failed by the control-plane watchdog after ~150s. The new Worker reads old snapshots fine (optional `tools` plus the `users.search` fallback), so Worker-first is safe in both directions; the reverse order breaks conversations that are in flight during the deploy. Control-plane replicas may be scaled freely — an instance that never registered a tool resolves it from the database on demand (see `CapabilitySource`).
+
 Roadmap:
 
 - [x] Phase 1 "RuoYi with AI": governed model-to-Agent-to-Runtime-to-tool-to-audit vertical loop

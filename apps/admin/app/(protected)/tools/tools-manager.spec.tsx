@@ -59,6 +59,67 @@ async function openEditDrawer() {
   return user;
 }
 
+/** Opens the tools drawer with the given tools served by the control plane. */
+async function openToolsDrawer(tools: Array<Record<string, unknown>>) {
+  globalThis.fetch = vi.fn(async () =>
+    new Response(JSON.stringify({ items: tools }), { status: 200 }),
+  ) as unknown as typeof fetch;
+  const user = userEvent.setup();
+  renderManager();
+  await user.click(screen.getByTestId(`tools-${authedServer.id}`));
+  await screen.findByText(String(tools[0]!.name));
+  return user;
+}
+
+function tool(overrides: Record<string, unknown>) {
+  return {
+    id: "019d2f5b-a8ab-7000-8000-0000000000aa",
+    serverId: authedServer.id,
+    name: "search_docs",
+    description: "Search the handbook.",
+    risk: "read",
+    requiredPermissions: ["users:read"],
+    enabled: true,
+    activation: "registered",
+    ...overrides,
+  };
+}
+
+describe("ToolsManager tool availability", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it("reports an enabled tool that is not registered instead of showing it as usable", async () => {
+    await openToolsDrawer([
+      tool({ activation: "permissions_required" }),
+      tool({ id: "019d2f5b-a8ab-7000-8000-0000000000bb", name: "ghost_docs" }),
+    ]);
+
+    expect(screen.getByTestId("tool-availability-permissions_required")).toBeInTheDocument();
+    expect(screen.getByTestId("tool-availability-registered")).toBeInTheDocument();
+    // The drawer tells the admin how many enabled tools cannot be called.
+    expect(screen.getByTestId("tools-unusable-warning")).toBeInTheDocument();
+  });
+
+  it("stays quiet when every enabled tool is registered", async () => {
+    await openToolsDrawer([
+      tool({}),
+      tool({
+        id: "019d2f5b-a8ab-7000-8000-0000000000bb",
+        name: "delete_docs",
+        enabled: false,
+        activation: "disabled",
+      }),
+    ]);
+
+    expect(screen.getByTestId("tool-availability-registered")).toBeInTheDocument();
+    expect(screen.queryByTestId("tools-unusable-warning")).not.toBeInTheDocument();
+  });
+});
+
 describe("ToolsManager credential handling", () => {
   afterEach(() => {
     cleanup();

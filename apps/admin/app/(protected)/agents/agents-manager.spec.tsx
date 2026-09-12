@@ -213,6 +213,7 @@ describe("AgentsManager", () => {
   it("hides the tools tab without the assign-tools permission and lists only selectable MCP tools", async () => {
     const mcpToolId = "019d2f5b-a8ab-7000-8000-0000000000aa";
     const disabledToolId = "019d2f5b-a8ab-7000-8000-0000000000bb";
+    const unregisteredToolId = "019d2f5b-a8ab-7000-8000-0000000000cc";
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path.endsWith("/capabilities")) return new Response(JSON.stringify([]), { status: 200 });
@@ -240,6 +241,7 @@ describe("AgentsManager", () => {
                 risk: "read",
                 requiredPermissions: ["users:read"],
                 enabled: true,
+                activation: "registered",
               },
               {
                 id: disabledToolId,
@@ -248,6 +250,16 @@ describe("AgentsManager", () => {
                 risk: "critical",
                 requiredPermissions: ["users:read"],
                 enabled: false,
+                activation: "disabled",
+              },
+              {
+                id: unregisteredToolId,
+                name: "orphan_docs",
+                description: "Enabled but never registered.",
+                risk: "read",
+                requiredPermissions: ["users:read"],
+                enabled: true,
+                activation: "permissions_required",
               },
             ],
           }),
@@ -268,6 +280,12 @@ describe("AgentsManager", () => {
     // A tool that is not enabled on its server must not be bindable.
     expect(screen.getByTestId(`tool-select-${disabledToolId}`)).toBeDisabled();
     expect(screen.getByTestId(`tool-select-${mcpToolId}`)).toBeChecked();
+    // An enabled tool that never registered is still bindable, but the binding
+    // is flagged: the model will never see it.
+    expect(screen.getByTestId(`tool-select-${unregisteredToolId}`)).toBeEnabled();
+    expect(
+      screen.getByTestId("agent-tool-availability-permissions_required"),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByTestId("save-agent-tools"));
     await waitFor(() => expect(mocks.tools).toHaveBeenCalledWith(detail.id, [mcpToolId]));

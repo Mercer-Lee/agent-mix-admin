@@ -658,6 +658,7 @@ export function AgentsManager({
                 risk: McpToolOption["risk"];
                 requiredPermissions: string[];
                 enabled: boolean;
+                activation: McpToolOption["activation"];
               }>;
             }>(`/api/mcp/servers/${server.id}/tools`);
             return response.items.map((tool) => ({
@@ -1086,6 +1087,25 @@ export function AgentsManager({
                     width: 90,
                     render: (enabled: boolean) =>
                       enabled ? <Tag color="lime">{t("tools.columnEnabled")}</Tag> : <Tag>—</Tag>,
+                  },
+                  {
+                    // An enabled tool that never registered is bindable but can
+                    // never reach the model; say so instead of losing it silently.
+                    title: t("tools.columnAvailability"),
+                    dataIndex: "activation",
+                    width: 150,
+                    render: (activation: McpToolOption["activation"]) =>
+                      activation === "registered" ? (
+                        <Tag color="lime">{t("tools.activation.registered")}</Tag>
+                      ) : activation === "disabled" ? (
+                        <span className="text-xs text-zinc-600">{t("tools.activation.disabled")}</span>
+                      ) : (
+                        <Tooltip title={t(`tools.activationHint.${activation}`)}>
+                          <Tag color="warning" data-testid={`agent-tool-availability-${activation}`}>
+                            {t(`tools.activation.${activation}`)}
+                          </Tag>
+                        </Tooltip>
+                      ),
                   },
                 ]}
               />

@@ -303,4 +303,81 @@ describe("Runtime capability snapshot binding", () => {
       ),
     ).toBe("CAPABILITY_FORBIDDEN");
   });
+
+  it("authorizes an MCP tool that the snapshot actually shipped to the model", () => {
+    const fixture = capabilityFixture();
+    const mcpTool = {
+      id: "mcp-docs.search_docs",
+      name: "search_docs-926677e1",
+      description: "Search the handbook.",
+      inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    };
+    const run = {
+      ...fixture.run,
+      executionSnapshot: {
+        ...fixture.snapshot,
+        capabilities: ["users.search", mcpTool.id],
+        tools: [mcpTool],
+      },
+    };
+    expect(
+      capabilityRequestFailureCode(
+        run,
+        { ...fixture.request, capability: mcpTool.id, input: { query: "handbook" } },
+        fixture.now,
+      ),
+    ).toBeNull();
+  });
+
+  it("refuses a capability the snapshot did not offer to the model", () => {
+    const fixture = capabilityFixture();
+    // `capabilities` lists the invocable set, but `tools` is what the model was
+    // actually given: a request for an id outside it was never model-invocable.
+    const run = {
+      ...fixture.run,
+      executionSnapshot: {
+        ...fixture.snapshot,
+        capabilities: ["users.search", "mcp-docs.search_docs"],
+        tools: [
+          {
+            id: "users.search",
+            name: "users_search",
+            description: "Search governed users.",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+      },
+    };
+    expect(
+      capabilityRequestFailureCode(
+        run,
+        {
+          ...fixture.request,
+          capability: "mcp-docs.search_docs",
+          input: { query: "handbook" },
+        },
+        fixture.now,
+      ),
+    ).toBe("CAPABILITY_FORBIDDEN");
+  });
+
+  it("denies every request when the snapshot offered the model no tools", () => {
+    const fixture = capabilityFixture();
+    // `tools: []` is present, so it is authoritative: falling back to
+    // `capabilities` here would authorize a call the model could not make.
+    const run = {
+      ...fixture.run,
+      executionSnapshot: { ...fixture.snapshot, tools: [] },
+    };
+    expect(
+      capabilityRequestFailureCode(run, fixture.request, fixture.now),
+    ).toBe("CAPABILITY_FORBIDDEN");
+  });
+
+  it("falls back to the capability list for a pre-2A snapshot without tools", () => {
+    const fixture = capabilityFixture();
+    // Descriptor-less snapshots (durable pre-2A rows, stall replays) still
+    // authorize their declared capabilities.
+    expect(capabilityRequestFailureCode(fixture.run, fixture.request, fixture.now)).toBeNull();
+  });
 });

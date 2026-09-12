@@ -52,6 +52,7 @@ type RuntimeSnapshot = {
   temperature: number;
   maxOutputTokens: number;
   maxSteps: number;
+  /** Invocable capability ids, mirroring `tools`. */
   capabilities: string[];
   tools: RuntimeToolDescriptorV1[];
 };
@@ -687,6 +688,16 @@ export class ConversationsService {
       temperature: row.temperature,
       maxOutputTokens: row.maxOutputTokens,
       maxSteps: row.maxSteps,
+      /**
+       * The full invocable set, mirroring `tools`. This field is also what
+       * RuntimeService.capabilityRequestFailureCode authorizes an incoming
+       * capability request against, so narrowing it would reject every MCP tool
+       * call with CAPABILITY_FORBIDDEN. It is deliberately NOT narrowed for the
+       * sake of pre-2A Workers: AgentRunTaskV1Schema is strict and has a `tools`
+       * key those Workers do not know, so they reject any new snapshot whatever
+       * this field holds. Upgrade order is Worker first (see
+       * docs/architecture.md, "部署顺序约束").
+       */
       capabilities: tools.map((tool) => tool.id),
       tools,
     };

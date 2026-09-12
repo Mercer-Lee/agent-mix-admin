@@ -178,6 +178,24 @@
       "sensitive_read": "Sensitive read",
       "write": "Write",
       "critical": "Critical"
+    },
+    "columnAvailability": "Availability",
+    "activation": {
+      "registered": "Registered",
+      "disabled": "Disabled",
+      "server_disabled": "Server disabled",
+      "invalid_capability_id": "Invalid name",
+      "permissions_required": "Permissions required",
+      "unknown_permissions": "Unknown permissions",
+      "registration_pending": "Not registered yet"
+    },
+    "activationHint": {
+      "server_disabled": "The parent MCP server is disabled; this tool cannot reach the model.",
+      "invalid_capability_id": "This tool name cannot form a governed capability id, so it is never exposed.",
+      "permissions_required": "Assign at least one required permission on the Tools page before enabling it.",
+      "unknown_permissions": "A required permission no longer exists; re-save the permissions for this tool.",
+      "registration_pending": "Not loaded on this control-plane instance yet. It resolves on demand, so the next tool call registers it; a sync or restart also refreshes it.",
+      "registered": "Registered on this control-plane instance: a governed run served by it can call this tool."
     }
   }
 }

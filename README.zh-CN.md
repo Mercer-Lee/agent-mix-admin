@@ -52,6 +52,8 @@ Phase 2A 已完成：控制面新增 MCP 工具注册表（Streamable HTTP），
 
 这个项目为什么存在、边界在哪里，见 [docs/vision.md](docs/vision.md)（愿景与缘起）；架构设计见 [docs/architecture.md](docs/architecture.md)。
 
+**跨 Phase 2A 升级：先升 Worker，再升 Server。** 运行快照契约是 `.strict()` 的：Phase 2A 之前的 Worker 契约里没有 `tools` 键，因此它会拒绝来自新控制面的**任何**快照。又因为该载荷无法解析，它也发不出终态事件，在途 run 只能等控制面 watchdog 在约 150s 后判失败。新 Worker 能正常读取旧快照（`tools` 可选，并保留 `users.search` 兜底），所以 worker 先行在两个方向上都安全；反过来则会打断升级期间正在进行的对话。控制面实例可以自由横向扩展——没注册过某工具实例会在调用时按需从数据库解析并注册（见 `CapabilitySource`）。
+
 路线图：
 
 - [x] Phase 1「带 AI 的若依」：模型 → Agent → Runtime → 工具 → 审计纵向闭环

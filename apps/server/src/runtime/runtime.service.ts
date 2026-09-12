@@ -224,11 +224,32 @@ export function capabilityRequestFailureCode(
     request.actorSubjectId !== snapshot.actorSubjectId ||
     request.agentSubjectId !== snapshot.agentSubjectId ||
     request.traceId !== snapshot.traceId ||
-    !snapshot.capabilities.includes(request.capability)
+    !isInvocableCapability(snapshot, request.capability)
   ) {
     return "CAPABILITY_FORBIDDEN";
   }
   return null;
+}
+
+/**
+ * Whether the run's immutable snapshot actually offered this capability to the
+ * model. `tools` is the model-facing tool set, so a call is only authorized when
+ * the id it names was really shipped in that snapshot; a snapshot that is
+ * allowed to list a larger set than it hands to the model would authorize
+ * requests the model could never have made. Pre-2A snapshots carry no tools and
+ * fall back to `capabilities`, which was their complete list.
+ */
+function isInvocableCapability(
+  snapshot: AgentRunTaskV1,
+  capability: string,
+): boolean {
+  // Keyed on presence, not truthiness: an empty tool list is authoritative and
+  // authorizes nothing, while only a pre-2A snapshot (no key at all) falls back
+  // to the capability list that was then the complete set.
+  if (snapshot.tools !== undefined) {
+    return snapshot.tools.some((tool) => tool.id === capability);
+  }
+  return snapshot.capabilities.includes(capability);
 }
 
 function normalizeUsageForDatabase(usage: {

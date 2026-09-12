@@ -70,10 +70,13 @@
   },
   "toolDrawer": {
     "title": "工具 / {name}",
-    "discoveryHint": "新发现的工具默认停用且无权限。请先配置所需权限再启用，然后在 Agent 页面将工具绑定给 Agent。"
+    "discoveryHint": "新发现的工具默认停用且无权限。请先配置所需权限再启用，然后在 Agent 页面将工具绑定给 Agent。",
+    "unusableTitle": "{total} 个工具中有 {count} 个已启用但未注册",
+    "unusableDetail": "「已启用」只是意图。工具只有在能力注册成功后才真正暴露给模型；在此之前，绑定它的 Agent 会静默失去该工具。"
   },
   "toolTable": {
     "tool": "工具",
+    "riskLevel": "风险",
     "noDescription": "暂无描述",
     "risk": {
       "read": "读取",
@@ -83,7 +86,25 @@
     },
     "permissions": "所需权限",
     "noPermissions": "未配置",
-    "enabled": "启用"
+    "enabled": "启用",
+    "availability": "可用性",
+    "activation": {
+      "registered": "已注册",
+      "disabled": "已停用",
+      "server_disabled": "服务器已停用",
+      "invalid_capability_id": "名称不合法",
+      "permissions_required": "缺少所需权限",
+      "unknown_permissions": "权限不存在",
+      "registration_pending": "尚未注册"
+    },
+    "activationHint": {
+      "server_disabled": "所属 MCP 服务器已停用，受治理的运行无法调用该工具。",
+      "invalid_capability_id": "该工具名无法构成合法的能力 id，因此永远不会暴露给模型。",
+      "permissions_required": "需要先分配至少一项所需权限才能启用该工具。",
+      "unknown_permissions": "某项所需权限已不存在于权限目录中，请重新保存权限以注册该工具。",
+      "registration_pending": "当前控制面实例尚未加载该能力。它会在调用时按需解析——下一次工具调用即会注册；重新同步或重启也会刷新。",
+      "registered": "已在当前控制面实例注册：由该实例服务的受治理运行可以调用此工具。"
+    }
   },
   "actions": {
     "forbidden": "你没有管理 MCP 工具注册表的权限。",

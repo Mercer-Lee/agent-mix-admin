@@ -349,6 +349,45 @@ describe("Agent Runtime OpenAI-compatible contract", () => {
     });
   });
 
+  it("offers both the internal vertical and bound MCP tools from one snapshot", async () => {
+    // The published snapshot carries the invocable ids in `capabilities` (which
+    // the control plane authorizes requests against) and the provider-facing
+    // descriptors in `tools` (which the Worker builds its tool set from). Both
+    // surfaces must describe the same set.
+    const task = runTask(["mcp-docs.search_docs", "users.search"]);
+    task.tools = [
+      {
+        id: "mcp-docs.search_docs",
+        name: deriveProviderToolName("mcp-docs.search_docs"),
+        description: "Search the handbook.",
+        inputSchema: { type: "object", properties: { query: { type: "string" } } },
+      },
+      {
+        id: "users.search",
+        name: "users_search",
+        description: "Search governed users.",
+        inputSchema: { type: "object", properties: { search: { type: "string" } } },
+      },
+    ];
+
+    const fake = await startFakeProvider((_request, response, call) => {
+      sendSse(response, call === 1 ? toolCallChunks() : textChunks("Done"));
+    });
+    const harness = createHarness(fake.baseURL);
+
+    await expect(harness.runtime.run(task)).resolves.toBe("completed");
+    const offered = (fake.requests[0]!.body.tools as Array<{ function: { name: string } }>)
+      .map((entry) => entry.function.name)
+      .sort();
+    expect(offered).toEqual([deriveProviderToolName("mcp-docs.search_docs"), "users_search"].sort());
+    // The bridge forwards exactly what the model produced; the control plane's
+    // CapabilityExecutor applies the capability's own input defaults.
+    expect(harness.requests[0]).toMatchObject({
+      capability: "users.search",
+      input: { search: "admin" },
+    });
+  });
+
   it("retries only a retryable 429 and resets partial attempt output", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fake = await startFakeProvider((_request, response, call) => {

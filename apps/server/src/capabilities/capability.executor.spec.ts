@@ -5,6 +5,8 @@ import type { AuditService } from "../audit/audit.service";
 import type { AuthorizationService } from "../rbac/authorization.service";
 import { CapabilityExecutor } from "./capability.executor";
 import { CapabilityRegistry } from "./capability.registry";
+import { CapabilityResolver } from "./capability.resolver";
+import { CapabilitySourceRegistry } from "./capability-source.registry";
 import { defineCapability } from "./capability.types";
 
 const context: CapabilityExecutionContext = {
@@ -28,6 +30,9 @@ describe("CapabilityExecutor", () => {
       registry,
       { getEffectivePermissionsForSubject: permissionLookup } as unknown as AuthorizationService,
       { record: auditRecord } as unknown as AuditService,
+      // No source registered: this harness registers everything it expects to
+      // resolve, so a miss must stay a miss.
+      new CapabilityResolver(registry, new CapabilitySourceRegistry()),
     );
   });
 

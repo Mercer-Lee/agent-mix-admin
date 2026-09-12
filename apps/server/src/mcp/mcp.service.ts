@@ -11,6 +11,9 @@ import { and, count, eq, inArray } from "drizzle-orm";
 import { CapabilityManifestSchema } from "@agentmix/core";
 import type { RegisteredCapability } from "../capabilities/capability.types";
 import { CapabilityRegistry } from "../capabilities/capability.registry";
+import type { CapabilitySchemaOverride } from "../capabilities/capability.registry";
+import type { CapabilitySource } from "../capabilities/capability.source";
+import { CapabilitySourceRegistry } from "../capabilities/capability-source.registry";
 import { AuditService } from "../audit/audit.service";
 import { DatabaseService } from "../database/database.service";
 import { mcpServers, mcpTools, permissions } from "../database/schema";
@@ -20,6 +23,7 @@ import {
   type McpEndpointConfig,
 } from "./mcp-client.service";
 import {
+  claimsMcpCapabilityNamespace,
   createJsonSchemaValidator,
   deriveMcpCapabilityId,
   deriveMcpModule,
@@ -27,6 +31,7 @@ import {
   MCP_TOOL_CAPABILITY_VERSION,
   validateDiscoveredToolName,
   type McpSyncErrorCode,
+  type McpToolActivationState,
   type McpToolRejectionReason,
 } from "./mcp.tooling";
 import type { CreateMcpServerDto } from "./dto/create-mcp-server.dto";
@@ -56,26 +61,22 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 @Injectable()
-export class McpService implements OnApplicationBootstrap {
+export class McpService implements OnApplicationBootstrap, CapabilitySource {
   private readonly logger = new Logger(McpService.name);
-  /**
-   * Capabilities this service registered into the registry, keyed by server id.
-   * The module is recorded alongside each id so removal can prove ownership.
-   */
-  private readonly registeredCapabilities = new Map<
-    string,
-    Array<{ id: string; module: string }>
-  >();
 
   constructor(
     private readonly database: DatabaseService,
     private readonly audit: AuditService,
     private readonly client: McpClientService,
     private readonly registry: CapabilityRegistry,
+    private readonly sources: CapabilitySourceRegistry,
   ) {}
 
   /** Register enabled tools of active servers so governed runs can use them. */
   async onApplicationBootstrap(): Promise<void> {
+    // Announced before the (best-effort) warm-up below: even if that fails, this
+    // instance must still be able to resolve a tool capability on demand.
+    this.sources.register(this);
     try {
       const servers = await this.database.db.select().from(mcpServers);
       for (const server of servers) {
@@ -259,13 +260,13 @@ export class McpService implements OnApplicationBootstrap {
   }
 
   async remove(id: string, actor: ActorMetadata) {
-    await this.database.db.transaction(async (tx) => {
+    const removed = await this.database.db.transaction(async (tx) => {
       const rows = await tx
         .delete(mcpServers)
         .where(eq(mcpServers.id, id))
         .returning({ id: mcpServers.id, slug: mcpServers.slug });
-      const removed = rows[0];
-      if (!removed) throw new NotFoundException("MCP server not found");
+      const deleted = rows[0];
+      if (!deleted) throw new NotFoundException("MCP server not found");
       await this.audit.record(
         {
           ...actor,
@@ -273,13 +274,17 @@ export class McpService implements OnApplicationBootstrap {
           resourceType: "mcp_server",
           resourceId: id,
           outcome: "success",
-          metadata: { slug: removed.slug },
+          metadata: { slug: deleted.slug },
         },
         tx,
       );
+      return deleted;
     });
-    await this.unregisterServerCapabilities(id);
-    this.client.invalidate(id);
+    // The slug must come from the deleting transaction: the row is already gone,
+    // so re-reading it by id would find nothing and silently skip the registry
+    // sweep, leaving this instance serving a deleted server's cached registrations.
+    await this.unregisterServerCapabilities(removed.slug);
+    this.client.invalidate(removed.id);
   }
 
   /**
@@ -436,17 +441,23 @@ export class McpService implements OnApplicationBootstrap {
 
   async listTools(serverId: string) {
     const servers = await this.database.db
-      .select({ id: mcpServers.id })
+      .select()
       .from(mcpServers)
       .where(eq(mcpServers.id, serverId))
       .limit(1);
-    if (!servers[0]) throw new NotFoundException("MCP server not found");
+    const server = servers[0];
+    if (!server) throw new NotFoundException("MCP server not found");
     const tools = await this.database.db
       .select()
       .from(mcpTools)
       .where(eq(mcpTools.serverId, serverId))
       .orderBy(mcpTools.name);
-    return { items: tools.map((tool) => this.serializeTool(tool)) };
+    const knownPermissions = await this.loadKnownPermissions();
+    return {
+      items: tools.map((tool) =>
+        this.serializeTool(tool, this.resolveToolActivation(server, tool, knownPermissions)),
+      ),
+    };
   }
 
   async updateTool(
@@ -508,40 +519,44 @@ export class McpService implements OnApplicationBootstrap {
       return tool;
     });
 
-    await this.registerServerTools(row.server);
-    return this.serializeTool(updated);
+    // One catalog read serves both the registration pass and the activation
+    // report returned to the admin.
+    // Availability below describes THIS instance's registry, which is the only
+    // registry this process can observe or serve capability requests from.
+    const knownPermissions = await this.loadKnownPermissions();
+    await this.registerServerTools(row.server, knownPermissions);
+    return this.serializeTool(
+      updated,
+      this.resolveToolActivation(row.server, updated, knownPermissions),
+    );
   }
 
-  private async registerServerTools(server: McpServerRow): Promise<void> {
-    await this.unregisterServerCapabilities(server.id);
-    if (server.status !== "active") return;
+  /**
+   * Reconciles this process's registry with the stored rows for one server.
+   * Runs after every server or tool mutation: eligible tools are registered
+   * from scratch, so the warm registry mirrors what `load` would build on demand.
+   */
+  private async registerServerTools(
+    server: McpServerRow,
+    preloadedPermissions?: Set<string>,
+  ): Promise<void> {
+    await this.unregisterServerCapabilities(server.slug);
 
-    const tools = await this.database.db
+    if (server.status !== "active") return;
+    const eligible = await this.database.db
       .select()
       .from(mcpTools)
       .where(and(eq(mcpTools.serverId, server.id), eq(mcpTools.enabled, true)));
-    if (!tools.length) return;
+    if (!eligible.length) return;
 
-    const permissionRows = await this.database.db
-      .select({ resource: permissions.resource, action: permissions.action })
-      .from(permissions);
-    const knownPermissions = new Set(
-      permissionRows.map(
-        (permission) => `${permission.resource}:${permission.action}`,
-      ),
-    );
-
-    const registered: Array<{ id: string; module: string }> = [];
-    for (const tool of tools) {
+    const knownPermissions = preloadedPermissions ?? (await this.loadKnownPermissions());
+    for (const tool of eligible) {
       const capabilityId = deriveMcpCapabilityId(server.slug, tool.name);
       if (!capabilityId) continue;
       if (!tool.requiredPermissions.length) continue;
-      if (
-        !tool.requiredPermissions.every((permission) =>
-          knownPermissions.has(permission),
-        )
-      )
+      if (!tool.requiredPermissions.every((permission) => knownPermissions.has(permission))) {
         continue;
+      }
       try {
         this.registry.register(
           this.buildCapabilityDefinition(server, tool, capabilityId),
@@ -550,16 +565,104 @@ export class McpService implements OnApplicationBootstrap {
             outputSchema: tool.outputSchema ?? {},
           },
         );
-        registered.push({ id: capabilityId, module: deriveMcpModule(server.slug) });
       } catch {
-        // A duplicate id means another capability already owns it; leave the
-        // tool unregistered rather than overriding an existing definition.
+        // A duplicate id means another capability already owns it; leave the tool
+        // unregistered rather than overriding an existing definition. The lazy
+        // source resolves by id, so this instance would refuse calls for it too.
         this.logger.error(
           `MCP tool capability registration skipped for ${capabilityId}`,
         );
       }
     }
-    this.registeredCapabilities.set(server.id, registered);
+  }
+
+  /**
+   * CapabilitySource.claims. Decided without the database on purpose: every id
+   * under the reserved `mcp-` prefix is ours to answer for, whether or not any
+   * row still backs it. Claiming by row alone would let a deleted server escape
+   * the fail-closed path — rows disappear, the prefix does not — and a cached
+   * definition of a deleted server would go right on executing.
+   */
+  async claims(capabilityId: string): Promise<boolean> {
+    return claimsMcpCapabilityNamespace(capabilityId);
+  }
+
+  /**
+   * CapabilitySource.load. Builds a tool's capability straight from the
+   * database, so a request served by an instance that never registered the
+   * tool — one that booted before it was enabled, or another replica — gets
+   * the same definition the current rows describe, reflecting admin intent
+   * (endpoint, risk, required permissions) rather than boot-time state.
+   *
+   * Deliberately read-through rather than cached: the registry already caches
+   * the built definition, and a second cache would need its own invalidation on
+   * every mutation. The catalog reads (enabled tools joined with active servers,
+   * plus the permission catalog) are full scans — acceptable at tool-registry
+   * scale next to the model call each lookup feeds; revisit with a derived
+   * capability-id column if registries grow large.
+   */
+  async load(
+    capabilityId: string,
+  ): Promise<{ definition: RegisteredCapability; schemas: CapabilitySchemaOverride } | null> {
+    const rows = await this.database.db
+      .select({ server: mcpServers, tool: mcpTools })
+      .from(mcpTools)
+      .innerJoin(mcpServers, eq(mcpTools.serverId, mcpServers.id))
+      .where(and(eq(mcpTools.enabled, true), eq(mcpServers.status, "active")));
+    const entry = rows.find(
+      (row) => deriveMcpCapabilityId(row.server.slug, row.tool.name) === capabilityId,
+    );
+    if (!entry) return null;
+    const { server, tool } = entry;
+    if (!tool.requiredPermissions.length) return null;
+    const knownPermissions = await this.loadKnownPermissions();
+    if (!tool.requiredPermissions.every((permission) => knownPermissions.has(permission))) {
+      return null;
+    }
+    try {
+      return {
+        definition: this.buildCapabilityDefinition(server, tool, capabilityId),
+        schemas: { inputSchema: tool.inputSchema, outputSchema: tool.outputSchema ?? {} },
+      };
+    } catch {
+      // A manifest that cannot be built (for example an invalid risk value) must
+      // read as "not available" rather than failing the run with a raw error.
+      return null;
+    }
+  }
+
+  /**
+   * Whether a governed run can actually call this tool. `enabled` is admin
+   * intent; this is the effective availability the executor enforces.
+   *
+   * Registration is no longer a per-instance lottery: any instance resolves a
+   * missing capability from the database on demand (see load), so a tool whose
+   * preconditions hold is callable on every replica. This method therefore
+   * reports the preconditions, and lets the registry answer what is currently
+   * loaded here.
+   */
+  private resolveToolActivation(
+    server: McpServerRow,
+    tool: McpToolRow,
+    knownPermissions: Set<string>,
+  ): McpToolActivationState {
+    const capabilityId = deriveMcpCapabilityId(server.slug, tool.name);
+    return resolveToolActivationState({
+      serverStatus: server.status,
+      enabled: tool.enabled,
+      capabilityId,
+      requiredPermissions: tool.requiredPermissions,
+      knownPermissions,
+      registered: capabilityId ? this.registry.get(capabilityId) !== undefined : false,
+    });
+  }
+
+  /** Known permissions, loaded once per request rather than once per tool. */
+  private async loadKnownPermissions(): Promise<Set<string>> {
+    const rows = await this.database.db
+      .select({ resource: permissions.resource, action: permissions.action })
+      .from(permissions);
+    return new Set(rows.map((row) => `${row.resource}:${row.action}`));
   }
 
   private buildCapabilityDefinition(
@@ -586,15 +689,22 @@ export class McpService implements OnApplicationBootstrap {
     };
   }
 
-  private async unregisterServerCapabilities(serverId: string): Promise<void> {
-    const registered = this.registeredCapabilities.get(serverId);
-    if (!registered) return;
-    for (const capability of registered) {
-      // Ownership-guarded: an instance that lost a registration race must not
-      // evict the live capability another owner registered under the same id.
-      this.registry.unregister(capability.id, { module: capability.module });
+  /**
+   * Evicts every capability of this server from this process's registry.
+   *
+   * Swept by module ownership: the executor registers lazily-resolved
+   * capabilities directly, so no bookkeeping list can be authoritative. A cached
+   * manifest carries the requiredPermissions that execution authorizes against,
+   * so leaving one behind would let a disabled or tightened tool keep running
+   * here. The slug must be supplied by the caller — the deleting transaction is
+   * the last place it is readable (see remove).
+   */
+  private async unregisterServerCapabilities(slug: string): Promise<void> {
+    const module = deriveMcpModule(slug);
+    for (const descriptor of this.registry.list()) {
+      // Ownership-guarded: another module's capability can never be evicted.
+      this.registry.unregister(descriptor.id, { module });
     }
-    this.registeredCapabilities.delete(serverId);
   }
 
   private endpointOf(server: McpServerRow): McpEndpointConfig {
@@ -650,7 +760,7 @@ export class McpService implements OnApplicationBootstrap {
     };
   }
 
-  private serializeTool(tool: McpToolRow) {
+  private serializeTool(tool: McpToolRow, activation: McpToolActivationState) {
     return {
       id: tool.id,
       serverId: tool.serverId,
@@ -659,8 +769,50 @@ export class McpService implements OnApplicationBootstrap {
       risk: tool.risk,
       requiredPermissions: tool.requiredPermissions,
       enabled: tool.enabled,
+      /**
+       * Effective availability, not admin intent: "registered" means a governed
+       * run can actually call this tool. Any other value on an enabled tool is a
+       * precondition the admin still has to satisfy.
+       */
+      activation,
       createdAt: tool.createdAt.toISOString(),
       updatedAt: tool.updatedAt.toISOString(),
     };
   }
+}
+
+export interface ToolActivationFacts {
+  serverStatus: McpServerRow["status"];
+  enabled: boolean;
+  /** Null when the tool name cannot form a governed capability id. */
+  capabilityId: string | null;
+  requiredPermissions: string[];
+  /** The permission catalog as currently stored. */
+  knownPermissions: Set<string>;
+  /** Whether this instance's registry currently holds the capability. */
+  registered: boolean;
+}
+
+/**
+ * The activation state machine, kept pure so every branch is directly testable
+ * and so the only inputs are facts the caller can actually observe. "registered"
+ * is the sole usable state; "disabled" is the admin's own switch; the rest mean
+ * an enabled tool cannot reach the model.
+ */
+export function resolveToolActivationState(
+  facts: ToolActivationFacts,
+): McpToolActivationState {
+  if (!facts.enabled) return "disabled";
+  if (facts.serverStatus !== "active") return "server_disabled";
+  if (!facts.capabilityId) return "invalid_capability_id";
+  if (!facts.requiredPermissions.length) return "permissions_required";
+  if (!facts.requiredPermissions.every((permission) => facts.knownPermissions.has(permission))) {
+    return "unknown_permissions";
+  }
+  if (facts.registered) return "registered";
+  // Every precondition holds, yet this instance has not loaded it. That is not a
+  // permanent state: the executor resolves a miss on demand, so the next call
+  // registers it. Reported as pending rather than registered because "loaded
+  // here, now" is what the admin is being told.
+  return "registration_pending";
 }

@@ -178,6 +178,24 @@
       "sensitive_read": "敏感读取",
       "write": "写入",
       "critical": "关键"
+    },
+    "columnAvailability": "可用性",
+    "activation": {
+      "registered": "已注册",
+      "disabled": "已停用",
+      "server_disabled": "服务器已停用",
+      "invalid_capability_id": "名称不合法",
+      "permissions_required": "缺少所需权限",
+      "unknown_permissions": "权限不存在",
+      "registration_pending": "尚未注册"
+    },
+    "activationHint": {
+      "server_disabled": "所属 MCP 服务器已停用，该工具无法暴露给模型。",
+      "invalid_capability_id": "该工具名无法构成合法的能力 id，永远不会暴露给模型。",
+      "permissions_required": "请先在工具页分配至少一项所需权限再启用。",
+      "unknown_permissions": "某项所需权限已不存在，请重新保存该工具的权限。",
+      "registration_pending": "当前控制面实例尚未加载该能力。它会在调用时按需解析——下一次工具调用即会注册；重新同步或重启也会刷新。",
+      "registered": "已在当前控制面实例注册：由该实例服务的受治理运行可以调用此工具。"
     }
   }
 }

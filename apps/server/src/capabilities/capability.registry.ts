@@ -58,6 +58,30 @@ export class CapabilityRegistry {
   }
 
   /**
+   * Replaces an existing registration, or adds it. Registrations whose source of
+   * truth is the database (MCP tools) are re-read per request, so keeping the
+   * cached entry aligned with the current row matters more than rejecting the
+   * duplicate: execution authorizes against the cached manifest.
+   */
+  upsert(
+    definition: AnyRegisteredCapability,
+    schemas?: CapabilitySchemaOverride,
+  ): CapabilityDescriptor {
+    const manifest = CapabilityManifestSchema.parse(definition.manifest);
+    const normalizedDefinition = { ...definition, manifest };
+    const descriptor: CapabilityDescriptor = {
+      ...manifest,
+      inputSchema:
+        schemas?.inputSchema ?? (z.toJSONSchema(definition.inputSchema) as Record<string, unknown>),
+      outputSchema:
+        schemas?.outputSchema ??
+        (z.toJSONSchema(definition.outputSchema) as Record<string, unknown>),
+    };
+    this.entries.set(manifest.id, { definition: normalizedDefinition, descriptor });
+    return descriptor;
+  }
+
+  /**
    * Removes a capability only when `owner` still matches the registered entry.
    * Registrations live in process memory while their source of truth is the
    * database, so a stale caller (an MCP server that lost a registration race,

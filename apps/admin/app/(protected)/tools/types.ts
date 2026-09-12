@@ -50,6 +50,23 @@ export interface McpServerUpdateInput {
 
 export type McpServerMutationInput = McpServerCreateInput | McpServerUpdateInput;
 
+/**
+ * Why a tool can or cannot be called by a governed run. `registered` is the only
+ * usable state; `disabled` is the admin's own switch; the rest mean the tool is
+ * enabled but a precondition is still missing.
+ *
+ * Mirrors MCP_TOOL_ACTIVATION_STATES in apps/server/src/mcp/mcp.tooling.ts —
+ * keep the two lists in step; the admin renders one i18n key per value.
+ */
+export type McpToolActivation =
+  | "registered"
+  | "disabled"
+  | "server_disabled"
+  | "invalid_capability_id"
+  | "permissions_required"
+  | "unknown_permissions"
+  | "registration_pending";
+
 export interface McpTool {
   id: string;
   serverId: string;
@@ -58,6 +75,7 @@ export interface McpTool {
   risk: McpToolRisk;
   requiredPermissions: string[];
   enabled: boolean;
+  activation: McpToolActivation;
   createdAt?: string;
   updatedAt?: string;
 }

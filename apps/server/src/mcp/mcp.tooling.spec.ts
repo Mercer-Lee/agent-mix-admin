@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  claimsMcpCapabilityNamespace,
   createJsonSchemaValidator,
   deriveMcpCapabilityId,
   deriveMcpModule,
@@ -29,6 +30,21 @@ describe("MCP capability id derivation", () => {
     expect(validateDiscoveredToolName("has space")).toBe(false);
     expect(validateDiscoveredToolName("")).toBe(false);
     expect(validateDiscoveredToolName("x".repeat(65))).toBe(false);
+  });
+});
+
+describe("MCP capability namespace claims", () => {
+  it("claims every id under the reserved prefix, with or without backing rows", () => {
+    // The claim must survive row deletion: a deleted server's id is exactly the
+    // one whose cached definition must never be served again.
+    expect(claimsMcpCapabilityNamespace("mcp-docs.search_docs")).toBe(true);
+    expect(claimsMcpCapabilityNamespace("mcp-docs.deleted_tool")).toBe(true);
+  });
+
+  it("never claims code-defined capability ids", () => {
+    expect(claimsMcpCapabilityNamespace("users.search")).toBe(false);
+    // The prefix is exact, not a substring match.
+    expect(claimsMcpCapabilityNamespace("mcpdocs.search")).toBe(false);
   });
 });
 

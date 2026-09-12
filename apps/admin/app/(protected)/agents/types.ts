@@ -1,3 +1,5 @@
+import type { McpToolActivation } from "../tools/types";
+
 export interface AgentSummary {
   id: string;
   slug: string;
@@ -113,6 +115,9 @@ export interface AgentInvocationAccessInput {
   departments: Array<{ departmentId: string; includeDescendants: boolean }>;
 }
 
+/** Both admin surfaces share one activation contract. */
+export type { McpToolActivation } from "../tools/types";
+
 export interface AgentToolsState {
   agentId: string;
   toolIds: string[];
@@ -127,6 +132,11 @@ export interface McpToolOption {
   risk: "read" | "sensitive_read" | "write" | "critical";
   requiredPermissions: string[];
   enabled: boolean;
+  /**
+   * Effective availability from the tool registry. `enabled` is intent; an
+   * enabled tool whose activation is not "registered" cannot reach the model.
+   */
+  activation: McpToolActivation;
 }
 
 export interface AgentManagerAccess {
